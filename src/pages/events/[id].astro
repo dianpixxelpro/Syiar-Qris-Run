@@ -1034,6 +1034,7 @@ const isFinished = event.status === 'FINISHED';
       z-index: 999;
       background: #ffffff;
       padding: 0.85rem 1.25rem;
+      padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
       border-top: 1px solid rgba(148, 163, 184, 0.35);
       box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.12);
       backdrop-filter: blur(10px);
@@ -1106,7 +1107,7 @@ const isFinished = event.status === 'FINISHED';
     }
 
     .floating-wa.has-sticky-bar {
-      bottom: 90px !important;
+      bottom: calc(115px + env(safe-area-inset-bottom, 0px)) !important;
     }
   }
 </style>
