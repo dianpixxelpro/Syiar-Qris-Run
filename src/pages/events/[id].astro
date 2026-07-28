@@ -96,7 +96,7 @@ const isFinished = event.status === 'FINISHED';
 <Layout
   title={`${event.title} - Pendaftaran Resmi`}
   description={`Daftar ${event.title} di Kediri Town Square pada 16 Agustus 2026. Harga tiket Rp 150.000 dengan benefit Jersey, Medali Finisher, BIB, dan Doorprize.`}
-  image={event.imageUrl}
+  image="/gambar-banner.webp"
   schemaType="Event"
 >
   <section class="event-detail-section">
@@ -107,7 +107,7 @@ const isFinished = event.status === 'FINISHED';
       <!-- Kolom Info Atas (Full Width) -->
       <div class="info-column" style="margin-bottom: 2rem;">
         <div class="banner-wrapper glass">
-          <img src={event.imageUrl} alt={event.title} class="detail-banner" width="1200" height="320" fetchpriority="high" />
+          <img src="/gambar-banner.webp" alt={event.title} class="detail-banner" width="1200" height="320" fetchpriority="high" />
           <span class={`badge badge-${event.category.toLowerCase()} detail-badge`}>{event.category}</span>
         </div>
       </div>
