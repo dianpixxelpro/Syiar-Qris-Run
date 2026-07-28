@@ -4,91 +4,101 @@ export interface Props {
   description?: string;
   image?: string;
   canonicalURL?: URL | string;
-  type?: 'website' | 'article' | 'event';
+  type?: "website" | "article" | "event";
   noindex?: boolean;
   keywords?: string;
-  schemaType?: 'Event' | 'WebSite' | 'Article' | 'Organization';
+  schemaType?: "Event" | "WebSite" | "Article" | "Organization";
 }
 
 const {
   title,
   description = "Syiar QRIS Run 2026 adalah ajang lari resmi yang diselenggarakan oleh Bank Indonesia Kediri di Kediri Town Square pada 16 Agustus 2026. Daftar sekarang untuk mendukung digitalisasi pembayaran QRIS dan gaya hidup sehat!",
   image = "/logo.webp",
-  canonicalURL = new URL(Astro.url.pathname, Astro.site || "https://qrisrun.web.id"),
+  canonicalURL = new URL(
+    Astro.url.pathname,
+    Astro.site || "https://qrisrun.web.id",
+  ),
   type = "website",
   noindex = false,
   keywords = "Syiar QRIS Run, Syiar QRIS Run 2026, QRIS Run Kediri, Bank Indonesia Kediri, event lari Kediri 2026, fun run Kediri, daftar syiar qris run, event olahraga Jawa Timur, QRIS Bank Indonesia, lomba lari 2026",
   schemaType = "WebSite",
 } = Astro.props;
 
-const siteUrl = (Astro.site || new URL("https://qrisrun.web.id")).toString().replace(/\/$/, "");
-const absoluteImageUrl = image.startsWith("http") ? image : `${siteUrl}${image.startsWith("/") ? "" : "/"}${image}`;
-const absoluteCanonicalUrl = typeof canonicalURL === "string" ? canonicalURL : canonicalURL.toString();
+const siteUrl = (Astro.site || new URL("https://qrisrun.web.id"))
+  .toString()
+  .replace(/\/$/, "");
+const absoluteImageUrl = image.startsWith("http")
+  ? image
+  : `${siteUrl}${image.startsWith("/") ? "" : "/"}${image}`;
+const absoluteCanonicalUrl =
+  typeof canonicalURL === "string" ? canonicalURL : canonicalURL.toString();
 
-const fullTitle = title.includes("Syiar QRIS Run") ? title : `${title} - Syiar QRIS Run 2026`;
+const fullTitle = title.includes("Syiar QRIS Run")
+  ? title
+  : `${title} - Syiar QRIS Run 2026`;
 
 // Schema.org JSON-LD Structured Data
 const organizationSchema = {
   "@context": "https://schema.org",
   "@type": "Organization",
-  "name": "Bank Indonesia Kediri",
-  "url": siteUrl,
-  "logo": `${siteUrl}/logo.webp`,
-  "sameAs": [
+  name: "Bank Indonesia Kediri",
+  url: siteUrl,
+  logo: `${siteUrl}/logo.webp`,
+  sameAs: [
     "https://youtube.com/@bankindonesiakediri",
     "https://x.com/KPwBi_kediri",
     "https://instagram.com/bank_indonesia_kediri",
-    "https://tiktok.com/@bank.indonesia.ke"
-  ]
+    "https://tiktok.com/@bank.indonesia.ke",
+  ],
 };
 
 const eventSchema = {
   "@context": "https://schema.org",
   "@type": "SportsEvent",
-  "name": "Syiar QRIS Run 2026",
-  "description": description,
-  "startDate": "2026-08-16T05:30:00+07:00",
-  "endDate": "2026-08-16T11:00:00+07:00",
-  "eventStatus": "https://schema.org/EventScheduled",
-  "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
-  "location": {
+  name: "Syiar QRIS Run 2026",
+  description: description,
+  startDate: "2026-08-16T05:30:00+07:00",
+  endDate: "2026-08-16T11:00:00+07:00",
+  eventStatus: "https://schema.org/EventScheduled",
+  eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+  location: {
     "@type": "Place",
-    "name": "Kediri Town Square",
-    "address": {
+    name: "Kediri Town Square",
+    address: {
       "@type": "PostalAddress",
-      "streetAddress": "Jl. Hasanudin No.2, Balowerti, Kec. Kota",
-      "addressLocality": "Kediri",
-      "addressRegion": "Jawa Timur",
-      "postalCode": "64129",
-      "addressCountry": "ID"
-    }
+      streetAddress: "Jl. Hasanudin No.2, Balowerti, Kec. Kota",
+      addressLocality: "Kediri",
+      addressRegion: "Jawa Timur",
+      postalCode: "64129",
+      addressCountry: "ID",
+    },
   },
-  "image": [absoluteImageUrl],
-  "organizer": {
+  image: [absoluteImageUrl],
+  organizer: {
     "@type": "Organization",
-    "name": "Bank Indonesia Kediri",
-    "url": siteUrl
+    name: "Bank Indonesia Kediri",
+    url: siteUrl,
   },
-  "offers": {
+  offers: {
     "@type": "Offer",
-    "url": `${siteUrl}/events/1`,
-    "price": "150000",
-    "priceCurrency": "IDR",
-    "availability": "https://schema.org/InStock",
-    "validFrom": "2026-01-01T00:00:00+07:00"
-  }
+    url: `${siteUrl}/events/1`,
+    price: "81000",
+    priceCurrency: "IDR",
+    availability: "https://schema.org/InStock",
+    validFrom: "2026-01-01T00:00:00+07:00",
+  },
 };
 
 const websiteSchema = {
   "@context": "https://schema.org",
   "@type": "WebSite",
-  "name": "Syiar QRIS Run 2026",
-  "url": siteUrl,
-  "description": description,
-  "publisher": {
+  name: "Syiar QRIS Run 2026",
+  url: siteUrl,
+  description: description,
+  publisher: {
     "@type": "Organization",
-    "name": "Bank Indonesia Kediri"
-  }
+    name: "Bank Indonesia Kediri",
+  },
 };
 
 const activeSchema = schemaType === "Event" ? eventSchema : websiteSchema;
@@ -100,8 +110,18 @@ const activeSchema = schemaType === "Event" ? eventSchema : websiteSchema;
 <meta name="description" content={description} />
 <meta name="keywords" content={keywords} />
 <meta name="author" content="Bank Indonesia Kediri" />
-<meta name="robots" content={noindex ? "noindex, nofollow" : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"} />
-<meta name="googlebot" content={noindex ? "noindex, nofollow" : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"} />
+<meta
+  name="robots"
+  content={noindex
+    ? "noindex, nofollow"
+    : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"}
+/>
+<meta
+  name="googlebot"
+  content={noindex
+    ? "noindex, nofollow"
+    : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"}
+/>
 <link rel="canonical" href={absoluteCanonicalUrl} />
 <meta name="theme-color" content="#f8fafc" />
 <meta name="color-scheme" content="light" />
@@ -116,7 +136,10 @@ const activeSchema = schemaType === "Event" ? eventSchema : websiteSchema;
 <meta property="og:image:type" content="image/webp" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:image:alt" content="Syiar QRIS Run 2026 - Bank Indonesia Kediri" />
+<meta
+  property="og:image:alt"
+  content="Syiar QRIS Run 2026 - Bank Indonesia Kediri"
+/>
 <meta property="og:site_name" content="Syiar QRIS Run 2026" />
 <meta property="og:locale" content="id_ID" />
 
@@ -128,8 +151,14 @@ const activeSchema = schemaType === "Event" ? eventSchema : websiteSchema;
 <meta name="twitter:title" content={fullTitle} />
 <meta name="twitter:description" content={description} />
 <meta name="twitter:image" content={absoluteImageUrl} />
-<meta name="twitter:image:alt" content="Syiar QRIS Run 2026 - Bank Indonesia Kediri" />
+<meta
+  name="twitter:image:alt"
+  content="Syiar QRIS Run 2026 - Bank Indonesia Kediri"
+/>
 
 <!-- Schema.org JSON-LD Structured Data -->
-<script type="application/ld+json" set:html={JSON.stringify(organizationSchema)} />
+<script
+  type="application/ld+json"
+  set:html={JSON.stringify(organizationSchema)}
+/>
 <script type="application/ld+json" set:html={JSON.stringify(activeSchema)} />
