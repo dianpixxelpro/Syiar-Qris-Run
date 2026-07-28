@@ -147,6 +147,54 @@ if (Astro.request.method === "POST") {
       } else {
         errorMsg = "Gagal mengonfirmasi pembayaran.";
       }
+    } else if (action === "edit_reg" && idStr) {
+      const id = parseInt(idStr.toString(), 10);
+      const email = formData.get("email")?.toString() || "";
+      const phone = formData.get("phone")?.toString() || "";
+      const status = formData.get("status")?.toString() || "";
+      const receiptFile = formData.get("receipt") as File | null;
+      
+      const { updateRegistration, updateRegistrationStatus, uploadPaymentProof, getRegistrationWithEventById } = await import("../../../lib/db");
+      
+      let editSuccess = await updateRegistration(id, { email, phone });
+      
+      if (editSuccess) {
+        const regDetail = await getRegistrationWithEventById(id);
+        
+        if (status && regDetail && regDetail.status !== status) {
+           const updateStatusSuccess = await updateRegistrationStatus(id, status as any);
+           if (updateStatusSuccess && status === "PAID") {
+             const updatedReg = await getRegistrationWithEventById(id);
+             if (updatedReg) {
+               await sendTicketConfirmedEmail({
+                 to: email || updatedReg.email,
+                 name: updatedReg.name,
+                 eventTitle: updatedReg.eventTitle,
+                 eventDate: updatedReg.eventDate,
+                 eventLocation: updatedReg.eventLocation,
+                 amount: updatedReg.amount,
+                 regId: updatedReg.id,
+               });
+             }
+           }
+        }
+        
+        if (receiptFile && receiptFile.size > 0) {
+           if (receiptFile.size <= 2 * 1024 * 1024) {
+             const buffer = Buffer.from(await receiptFile.arrayBuffer());
+             const base64Image = `data:${receiptFile.type};base64,${buffer.toString("base64")}`;
+             await uploadPaymentProof(id, base64Image, new Date().toISOString());
+           } else {
+             errorMsg = "Data diupdate, tapi Bukti Transfer gagal diunggah (Ukuran terlalu besar, Maks 2MB).";
+           }
+        }
+        
+        if (!errorMsg) {
+           successMsg = "Data pendaftar berhasil diperbarui!";
+        }
+      } else {
+        errorMsg = "Gagal memperbarui data pendaftar.";
+      }
     } else if (action === "import_csv") {
       const file = formData.get("csv_file") as File;
       if (file && file.size > 0) {
@@ -251,9 +299,6 @@ if (Astro.request.method === "POST") {
 
 // Re-fetch data
 let registrationsDisplay = await getAllRegistrations();
-registrationsDisplay = registrationsDisplay.filter(
-  (reg) => reg.status !== "EXPIRED",
-);
 const allEvents = await getAllEvents();
 
 const formatPrice = (price: number) => {
@@ -453,38 +498,36 @@ const parseName = (nameStr: string) => {
                       </td>
                       <td class="date-cell">{formatDate(reg.createdAt)}</td>
                       <td>
-                        <div class="action-buttons">
+                        <div class="action-buttons" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                           {reg.status === "PENDING" ? (
                             reg.paymentProof ? (
-                              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                                 <form method="POST" style="margin: 0;">
-                                  <input
-                                    type="hidden"
-                                    name="action"
-                                    value="confirm"
-                                  />
+                                  <input type="hidden" name="action" value="confirm" />
                                   <input type="hidden" name="id" value={reg.id} />
-                                  <button
-                                    type="submit"
-                                    class="btn-table btn-confirm"
-                                  >
-                                    Konfirmasi Bayar
-                                  </button>
+                                  <button type="submit" class="btn-table btn-confirm">Konfirmasi Bayar</button>
                                 </form>
-                              </div>
                             ) : (
-                              <span style="font-size: 0.85rem; color: #94a3b8; font-style: italic;">
+                              <span style="font-size: 0.85rem; color: #94a3b8; font-style: italic; margin-right: 0.5rem;">
                                 Menunggu Bukti
                               </span>
                             )
+                          ) : reg.status === "EXPIRED" ? (
+                            <>
+                              <span style="font-size: 0.85rem; color: #ef4444; font-style: italic; margin-right: 0.5rem;">Kadaluarsa</span>
+                              <button
+                                type="button"
+                                class="btn-table btn-edit open-edit-modal-btn"
+                                data-id={reg.id}
+                                data-email={reg.email}
+                                data-phone={reg.phone}
+                                data-status={reg.status}
+                                style="background: rgba(45, 130, 255, 0.15); color: #3b82f6; border: 1px solid rgba(45, 130, 255, 0.4);"
+                              >
+                                ✏️ Edit
+                              </button>
+                            </>
                           ) : (
-                            <a
-                              href={`/ticket/${reg.id}`}
-                              class="btn-table btn-edit"
-                              target="_blank"
-                            >
-                              Lihat Tiket
-                            </a>
+                            <a href={`/ticket/${reg.id}`} class="btn-table btn-edit" target="_blank">Lihat Tiket</a>
                           )}
                         </div>
                       </td>
@@ -808,6 +851,50 @@ const parseName = (nameStr: string) => {
           </div>
         </div>
       </div>
+
+      <!-- Modal Edit Pendaftar -->
+      <div id="editRegModal" class="modal-overlay">
+        <div class="modal-content glass" style="max-width: 600px; padding: 2rem;">
+          <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+            <h3 style="margin: 0; font-size: 1.5rem;">✏️ Edit Pendaftar</h3>
+            <button class="close-modal" id="closeEditRegModal" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+          </div>
+          <form method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="action" value="edit_reg" />
+            <input type="hidden" name="id" id="editRegId" />
+            
+            <div class="form-group mb-3" style="margin-bottom: 1.2rem;">
+              <label style="display:block; margin-bottom:0.5rem;">Email Pemesan</label>
+              <input type="email" name="email" id="editRegEmail" class="form-control" required style="width:100%; padding:0.6rem; background:#1e293b; color:white; border:1px solid #334155; border-radius:4px;" />
+            </div>
+            
+            <div class="form-group mb-3" style="margin-bottom: 1.2rem;">
+              <label style="display:block; margin-bottom:0.5rem;">No. WhatsApp</label>
+              <input type="text" name="phone" id="editRegPhone" class="form-control" required style="width:100%; padding:0.6rem; background:#1e293b; color:white; border:1px solid #334155; border-radius:4px;" />
+            </div>
+            
+            <div class="form-group mb-3" style="margin-bottom: 1.2rem;">
+              <label style="display:block; margin-bottom:0.5rem;">Status Pendaftaran</label>
+              <select name="status" id="editRegStatus" class="form-control" required style="width:100%; padding:0.6rem; background:#1e293b; color:white; border:1px solid #334155; border-radius:4px;">
+                <option value="PENDING">PENDING (Menunggu Pembayaran)</option>
+                <option value="PAID">PAID (Lunas)</option>
+                <option value="EXPIRED">EXPIRED (Kadaluarsa)</option>
+              </select>
+            </div>
+            
+            <div class="form-group mb-3" style="margin-bottom: 1.5rem;">
+              <label style="display:block; margin-bottom:0.5rem;">Upload/Timpa Bukti Transfer (Opsional)</label>
+              <input type="file" name="receipt" accept="image/*" class="form-control" style="width:100%; padding:0.5rem; background:#1e293b; color:white; border:1px solid #334155; border-radius:4px;" />
+              <small style="color: #94a3b8; display: block; margin-top: 0.25rem;">Kosongkan jika tidak ingin mengubah bukti transfer.</small>
+            </div>
+            
+            <div style="display:flex; justify-content:flex-end; gap:1rem; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 1.5rem;">
+              <button type="button" class="btn btn-outline" id="cancelEditReg" style="padding: 0.6rem 1.5rem;">Batal</button>
+              <button type="submit" class="btn btn-primary" style="padding: 0.6rem 1.5rem;">Simpan Perubahan</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   </section>
 </AdminLayout>
@@ -860,6 +947,42 @@ const parseName = (nameStr: string) => {
       tableRows.forEach((row) => ((row as HTMLElement).style.display = ""));
     });
   }
+
+  // Edit Registration Modal Logic
+  const editRegModal = document.getElementById("editRegModal");
+  const closeEditRegModal = document.getElementById("closeEditRegModal");
+  const cancelEditReg = document.getElementById("cancelEditReg");
+  
+  const editRegId = document.getElementById("editRegId") as HTMLInputElement;
+  const editRegEmail = document.getElementById("editRegEmail") as HTMLInputElement;
+  const editRegPhone = document.getElementById("editRegPhone") as HTMLInputElement;
+  const editRegStatus = document.getElementById("editRegStatus") as HTMLSelectElement;
+
+  document.querySelectorAll(".open-edit-modal-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const target = e.currentTarget as HTMLElement;
+      editRegId.value = target.getAttribute("data-id") || "";
+      editRegEmail.value = target.getAttribute("data-email") || "";
+      editRegPhone.value = target.getAttribute("data-phone") || "";
+      
+      const status = target.getAttribute("data-status") || "PENDING";
+      for (let i = 0; i < editRegStatus.options.length; i++) {
+        if (editRegStatus.options[i].value === status) {
+          editRegStatus.selectedIndex = i;
+          break;
+        }
+      }
+      
+      if (editRegModal) editRegModal.classList.add("active");
+    });
+  });
+
+  const hideEditModal = () => {
+    if (editRegModal) editRegModal.classList.remove("active");
+  };
+
+  if (closeEditRegModal) closeEditRegModal.addEventListener("click", hideEditModal);
+  if (cancelEditReg) cancelEditReg.addEventListener("click", hideEditModal);
 
   const exportBtn = document.getElementById("btn-export-csv");
   if (exportBtn) {

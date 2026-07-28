@@ -159,7 +159,7 @@ const isFinished = event.status === 'FINISHED';
                   <div class="participant-container" id="participants-container">
                     <!-- Participant 1 -->
                     <div class="participant-block" data-index="1">
-                      <h4 class="form-section-title">Data Peserta 1</h4>
+                      <h4 class="form-section-title">Data Peserta</h4>
                       
                       <div class="form-group">
                         <label for="name_1">Nama Lengkap (Sesuai ID)</label>
@@ -194,10 +194,7 @@ const isFinished = event.status === 'FINISHED';
                     </div>
                   </div>
 
-                  <div class="add-participant-row mt-4">
-                    <button type="button" id="add-participant-btn" class="btn btn-accent btn-sm">+ Tambah Peserta</button>
-                    <button type="button" id="remove-participant-btn" class="btn btn-danger btn-sm" style="display: none;">- Kurangi Peserta</button>
-                  </div>
+
                   <input type="hidden" id="jumlah_peserta" name="jumlah_peserta" value="1" />
                   
                   <hr style="border-color: rgba(255,255,255,0.1); margin: 2rem 0;" />
@@ -232,7 +229,7 @@ const isFinished = event.status === 'FINISHED';
 
                   <div id="jersey-dropdowns-container">
                     <div class="form-group mt-3 jersey-select-block" data-index="1">
-                      <label for="ukuranJersey_1">Ukuran Jersey Peserta 1</label>
+                      <label for="ukuranJersey_1">Ukuran Jersey</label>
                       <select id="ukuranJersey_1" name="ukuranJersey_1" required>
                         <option value="S">S</option>
                         <option value="M">M</option>
@@ -280,7 +277,6 @@ const isFinished = event.status === 'FINISHED';
                 <div class="category-card selected mt-3">
                   <div class="category-info">
                     <span class="cat-name">{event.title}</span>
-                    <span class="cat-type">Total Peserta: <span id="summary-qty">1</span> Orang</span>
                     <span class="cat-price text-accent" id="summary-price" data-price={event.price}>{formatPrice(event.price)}</span>
                   </div>
                   <div class="category-badge">
@@ -330,80 +326,7 @@ const isFinished = event.status === 'FINISHED';
                       }
                     }
                     
-                    if (addBtn) {
-                      addBtn.addEventListener('click', () => {
-                        participantCount++;
-                        const template = `
-                          <div class="participant-block" data-index="${participantCount}" style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px dashed rgba(148, 163, 184, 0.35);">
-                            <h4 class="form-section-title">Data Peserta ${participantCount}</h4>
-                            <div class="form-group">
-                              <label for="name_${participantCount}">Nama Lengkap</label>
-                              <input type="text" id="name_${participantCount}" name="name_${participantCount}" required placeholder="Isi Nama sesuai ID Card Anda" />
-                            </div>
-                            <div class="form-row mt-3">
-                              <div class="form-group half">
-                                <label for="jenisKelamin_${participantCount}">Jenis Kelamin</label>
-                                <select id="jenisKelamin_${participantCount}" name="jenisKelamin_${participantCount}" required>
-                                  <option value="Pria">Pria</option>
-                                  <option value="Wanita">Wanita</option>
-                                </select>
-                              </div>
-                              <div class="form-group half">
-                                <label for="jenisId_${participantCount}">Jenis ID</label>
-                                <select id="jenisId_${participantCount}" name="jenisId_${participantCount}" required>
-                                  <option value="KTP">KTP</option>
-                                  <option value="SIM">SIM</option>
-                                  <option value="Paspor">Paspor</option>
-                                  <option value="Kartu Pelajar">Kartu Pelajar</option>
-                                </select>
-                              </div>
-                            </div>
-                            <div class="form-group mt-3">
-                              <label for="nomorId_${participantCount}">Nomor ID</label>
-                              <input type="text" id="nomorId_${participantCount}" name="nomorId_${participantCount}" required placeholder="Isi dengan Nomor NIK Anda" />
-                            </div>
-                          </div>
-                        `;
-                        const jerseyTemplate = `
-                          <div class="form-group mt-3 jersey-select-block" data-index="${participantCount}">
-                            <label for="ukuranJersey_${participantCount}">Ukuran Jersey Peserta ${participantCount}</label>
-                            <select id="ukuranJersey_${participantCount}" name="ukuranJersey_${participantCount}" required>
-                              <option value="S">S</option>
-                              <option value="M">M</option>
-                              <option value="L">L</option>
-                              <option value="XL">XL</option>
-                              <option value="XXL">XXL</option>
-                            </select>
-                          </div>
-                        `;
-                        if (container) container.insertAdjacentHTML('beforeend', template);
-                        const jerseyContainer = document.getElementById('jersey-dropdowns-container');
-                        if (jerseyContainer) jerseyContainer.insertAdjacentHTML('beforeend', jerseyTemplate);
-                        updateSummary();
-                      });
-                    }
-                    
-                    if (removeBtn) {
-                      removeBtn.addEventListener('click', () => {
-                        if (participantCount > 1) {
-                          if (container) {
-                            const block = container.querySelector(`.participant-block[data-index="${participantCount}"]`);
-                            if (block) {
-                              block.remove();
-                              
-                              const jerseyContainer = document.getElementById('jersey-dropdowns-container');
-                              if (jerseyContainer) {
-                                const jerseyBlock = jerseyContainer.querySelector(`.jersey-select-block[data-index="${participantCount}"]`);
-                                if (jerseyBlock) jerseyBlock.remove();
-                              }
-                              
-                              participantCount--;
-                              updateSummary();
-                            }
-                          }
-                        }
-                      });
-                    }
+
                   });
                 </script>
 
