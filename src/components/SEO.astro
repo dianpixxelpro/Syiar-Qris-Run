@@ -16,7 +16,7 @@ const {
   image = "/logo.webp",
   canonicalURL = new URL(
     Astro.url.pathname,
-    Astro.site || "https://qrisrun.web.id",
+    Astro.site || "https://qrisrun.com",
   ),
   type = "website",
   noindex = false,
@@ -24,7 +24,7 @@ const {
   schemaType = "WebSite",
 } = Astro.props;
 
-const siteUrl = (Astro.site || new URL("https://qrisrun.web.id"))
+const siteUrl = (Astro.site || new URL("https://qrisrun.com"))
   .toString()
   .replace(/\/$/, "");
 const absoluteImageUrl = image.startsWith("http")
