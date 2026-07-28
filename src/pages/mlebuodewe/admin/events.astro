@@ -34,6 +34,15 @@ const formatPrice = (price: number) => {
   if (price === 0) return 'Gratis';
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
 };
+
+const formatDate = (dateStr: string) => {
+  try {
+    const options: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+    return new Date(dateStr).toLocaleDateString('id-ID', options);
+  } catch(e) {
+    return dateStr;
+  }
+};
 ---
 
 <AdminLayout title="Manajemen Event">
@@ -76,7 +85,7 @@ const formatPrice = (price: number) => {
                 {eventsDisplay.map((event) => (
                   <tr>
                     <td>
-                      <img src={event.imageUrl} alt={event.title} class="table-img" />
+                      <img src={event.imageUrl || "/gambar-banner.webp"} alt={event.title} class="table-img" onerror="this.src='/gambar-banner.webp';" />
                     </td>
                     <td>
                       <div class="event-name-cell">
@@ -87,7 +96,7 @@ const formatPrice = (price: number) => {
                     <td>
                       <span class={`badge badge-${event.category.toLowerCase()}`}>{event.category}</span>
                     </td>
-                    <td>{event.date}</td>
+                    <td>{formatDate(event.date)}</td>
                     <td>{event.location}</td>
                     <td>{formatPrice(event.price)}</td>
                     <td>{event.registered} / {event.slots}</td>

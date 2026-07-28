@@ -224,15 +224,7 @@ export async function getRegistrationById(id: number): Promise<Registration | un
 }
 
 export async function getAllRegistrations(): Promise<(Registration & { eventTitle: string })[]> {
-  // Auto-cleanup: Hapus pendaftar PENDING tanpa bukti transfer yang sudah lewat 20 menit
-  const twentyMinsAgo = new Date(Date.now() - 20 * 60 * 1000).toISOString();
-  supabase
-    .from('registrations')
-    .delete()
-    .eq('status', 'PENDING')
-    .is('payment_proof', null)
-    .lt('created_at', twentyMinsAgo)
-    .then(() => {}, () => {});
+  // Auto-cleanup dinonaktifkan agar data EXPIRED tetap muncul di admin
 
   const { data, error } = await supabase
     .from('registrations')
@@ -319,8 +311,8 @@ export async function updateRegistrationStatus(id: number, status: 'PENDING' | '
   const currentReg = await getRegistrationById(id);
   if (!currentReg) return false;
 
-  // Jika status berubah dari PENDING ke PAID
-  if (currentReg.status === 'PENDING' && status === 'PAID') {
+  // Jika status berubah dari PENDING/EXPIRED ke PAID
+  if ((currentReg.status === 'PENDING' || currentReg.status === 'EXPIRED') && status === 'PAID') {
     // Jalankan update berurutan (di Supabase kita lakukan step by step karena tidak ada block transaction langsung lewat client)
     const { error: regError } = await supabase
       .from('registrations')
@@ -378,6 +370,26 @@ export async function updateRegistrationAmount(id: number, amount: number): Prom
 
   if (error) {
     console.error(`Error updating amount for registration ${id}:`, error);
+    return false;
+  }
+  return true;
+}
+
+export async function updateRegistration(id: number, data: any): Promise<boolean> {
+  const updateData: any = {};
+  if (data.name !== undefined) updateData.name = data.name;
+  if (data.email !== undefined) updateData.email = data.email;
+  if (data.phone !== undefined) updateData.phone = data.phone;
+
+  if (Object.keys(updateData).length === 0) return true;
+
+  const { error } = await supabase
+    .from('registrations')
+    .update(updateData)
+    .eq('id', id);
+
+  if (error) {
+    console.error(`Error updating registration ${id}:`, error);
     return false;
   }
   return true;
