@@ -15,66 +15,73 @@ if (!event) {
   return Astro.redirect('/');
 }
 
+const registrationOpenDate = new Date('2026-07-31T08:00:00+07:00');
+const isRegistrationOpen = new Date() >= registrationOpenDate;
+
 let errorMsg = '';
 
 if (Astro.request.method === 'POST') {
-  try {
-    const formData = await Astro.request.formData();
-    const email = formData.get('email')?.toString() || '';
-    const phone = formData.get('phone')?.toString() || '';
+  if (!isRegistrationOpen) {
+    errorMsg = 'Pendaftaran belum dibuka. Silakan kembali pada 31 Juli 2026 pukul 08:00 WIB.';
+  } else {
+    try {
+      const formData = await Astro.request.formData();
+      const email = formData.get('email')?.toString() || '';
+      const phone = formData.get('phone')?.toString() || '';
 
-    // Parse collective participants
-    const participants = [];
-    let i = 1;
-    while (formData.has(`name_${i}`)) {
-      participants.push({
-        name: formData.get(`name_${i}`)?.toString() || '',
-        jenisKelamin: formData.get(`jenisKelamin_${i}`)?.toString() || '',
-        jenisId: formData.get(`jenisId_${i}`)?.toString() || '',
-        nomorId: formData.get(`nomorId_${i}`)?.toString() || '',
-        ukuranJersey: formData.get(`ukuranJersey_${i}`)?.toString() || ''
-      });
-      i++;
-    }
-
-    if (participants.length === 0 || !email || !phone) {
-      errorMsg = 'Data peserta, email, dan nomor WhatsApp wajib diisi!';
-    } else if (event.registered + participants.length > event.slots) {
-      errorMsg = 'Maaf, sisa kuota pendaftaran tidak mencukupi untuk jumlah peserta ini.';
-    } else {
-      // Gunakan harga asli event dari database
-      const basePrice = event.price;
-      const totalBase = basePrice * participants.length;
-
-      // Store participants as JSON string in the name field to avoid DB schema changes
-      const nameField = JSON.stringify(participants);
-
-      // Buat pendaftaran baru dengan status PENDING
-      const regId = await createRegistration({
-        eventId: event.id,
-        name: nameField,
-        email,
-        phone,
-        status: 'PENDING',
-        amount: totalBase,
-        paymentMethod: 'QRIS',
-        checkedIn: false
-      });
-
-      if (regId) {
-        // Gunakan ID Registrasi sebagai kode unik (mulai dari 1)
-        const uniqueCode = regId;
-        const finalAmount = totalBase + uniqueCode;
-        await updateRegistrationAmount(regId, finalAmount);
-        
-        return Astro.redirect(`/checkout/${regId}`);
-      } else {
-        errorMsg = 'Gagal memproses pendaftaran. Silakan coba lagi.';
+      // Parse collective participants
+      const participants = [];
+      let i = 1;
+      while (formData.has(`name_${i}`)) {
+        participants.push({
+          name: formData.get(`name_${i}`)?.toString() || '',
+          jenisKelamin: formData.get(`jenisKelamin_${i}`)?.toString() || '',
+          jenisId: formData.get(`jenisId_${i}`)?.toString() || '',
+          nomorId: formData.get(`nomorId_${i}`)?.toString() || '',
+          ukuranJersey: formData.get(`ukuranJersey_${i}`)?.toString() || ''
+        });
+        i++;
       }
+
+      if (participants.length === 0 || !email || !phone) {
+        errorMsg = 'Data peserta, email, dan nomor WhatsApp wajib diisi!';
+      } else if (event.registered + participants.length > event.slots) {
+        errorMsg = 'Maaf, sisa kuota pendaftaran tidak mencukupi untuk jumlah peserta ini.';
+      } else {
+        // Gunakan harga asli event dari database
+        const basePrice = event.price;
+        const totalBase = basePrice * participants.length;
+
+        // Store participants as JSON string in the name field to avoid DB schema changes
+        const nameField = JSON.stringify(participants);
+
+        // Buat pendaftaran baru dengan status PENDING
+        const regId = await createRegistration({
+          eventId: event.id,
+          name: nameField,
+          email,
+          phone,
+          status: 'PENDING',
+          amount: totalBase,
+          paymentMethod: 'QRIS',
+          checkedIn: false
+        });
+
+        if (regId) {
+          // Gunakan ID Registrasi sebagai kode unik (mulai dari 1)
+          const uniqueCode = regId;
+          const finalAmount = totalBase + uniqueCode;
+          await updateRegistrationAmount(regId, finalAmount);
+          
+          return Astro.redirect(`/checkout/${regId}`);
+        } else {
+          errorMsg = 'Gagal memproses pendaftaran. Silakan coba lagi.';
+        }
+      }
+    } catch (err) {
+      errorMsg = 'Terjadi kesalahan saat memproses pendaftaran.';
+      console.error(err);
     }
-  } catch (err) {
-    errorMsg = 'Terjadi kesalahan saat memproses pendaftaran.';
-    console.error(err);
   }
 }
 
@@ -133,6 +140,11 @@ const isFinished = event.status === 'FINISHED';
                 <div class="status-alert alert-danger text-center">
                   <strong>Event Telah Selesai</strong>
                   <p>Pendaftaran sudah ditutup untuk event ini.</p>
+                </div>
+              ) : !isRegistrationOpen ? (
+                <div class="status-alert alert-danger text-center" style="padding: 2rem;">
+                  <strong>Pendaftaran Belum Dibuka</strong>
+                  <p style="margin-top: 0.5rem; font-size: 1.1rem;">Pendaftaran akan dibuka pada tanggal 31 Juli 2026 pukul 08:00 WIB.</p>
                 </div>
               ) : isFull ? (
                 <div class="status-alert alert-danger text-center">
@@ -254,7 +266,7 @@ const isFinished = event.status === 'FINISHED';
           </div>
           
           <!-- Kolom Ringkasan Kanan (Sticky) -->
-          {!isFinished && !isFull && (
+          {!isFinished && !isFull && isRegistrationOpen && (
             <div class="summary-column">
               <div class="reg-card glass">
                 <div class="price-header" style="margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px dashed rgba(255,255,255,0.2);">
