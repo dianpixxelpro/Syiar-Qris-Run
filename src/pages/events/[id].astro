@@ -15,66 +15,73 @@ if (!event) {
   return Astro.redirect('/');
 }
 
+const registrationOpenDate = new Date('2026-07-31T08:00:00+07:00');
+const isRegistrationOpen = new Date() >= registrationOpenDate;
+
 let errorMsg = '';
 
 if (Astro.request.method === 'POST') {
-  try {
-    const formData = await Astro.request.formData();
-    const email = formData.get('email')?.toString() || '';
-    const phone = formData.get('phone')?.toString() || '';
+  if (!isRegistrationOpen) {
+    errorMsg = 'Pendaftaran belum dibuka. Silakan kembali pada 31 Juli 2026 pukul 08:00 WIB.';
+  } else {
+    try {
+      const formData = await Astro.request.formData();
+      const email = formData.get('email')?.toString() || '';
+      const phone = formData.get('phone')?.toString() || '';
 
-    // Parse collective participants
-    const participants = [];
-    let i = 1;
-    while (formData.has(`name_${i}`)) {
-      participants.push({
-        name: formData.get(`name_${i}`)?.toString() || '',
-        jenisKelamin: formData.get(`jenisKelamin_${i}`)?.toString() || '',
-        jenisId: formData.get(`jenisId_${i}`)?.toString() || '',
-        nomorId: formData.get(`nomorId_${i}`)?.toString() || '',
-        ukuranJersey: formData.get(`ukuranJersey_${i}`)?.toString() || ''
-      });
-      i++;
-    }
-
-    if (participants.length === 0 || !email || !phone) {
-      errorMsg = 'Data peserta, email, dan nomor WhatsApp wajib diisi!';
-    } else if (event.registered + participants.length > event.slots) {
-      errorMsg = 'Maaf, sisa kuota pendaftaran tidak mencukupi untuk jumlah peserta ini.';
-    } else {
-      // Gunakan harga asli event dari database
-      const basePrice = event.price;
-      const totalBase = basePrice * participants.length;
-
-      // Store participants as JSON string in the name field to avoid DB schema changes
-      const nameField = JSON.stringify(participants);
-
-      // Buat pendaftaran baru dengan status PENDING
-      const regId = await createRegistration({
-        eventId: event.id,
-        name: nameField,
-        email,
-        phone,
-        status: 'PENDING',
-        amount: totalBase,
-        paymentMethod: 'QRIS',
-        checkedIn: false
-      });
-
-      if (regId) {
-        // Gunakan ID Registrasi sebagai kode unik (mulai dari 1)
-        const uniqueCode = regId;
-        const finalAmount = totalBase + uniqueCode;
-        await updateRegistrationAmount(regId, finalAmount);
-        
-        return Astro.redirect(`/checkout/${regId}`);
-      } else {
-        errorMsg = 'Gagal memproses pendaftaran. Silakan coba lagi.';
+      // Parse collective participants
+      const participants = [];
+      let i = 1;
+      while (formData.has(`name_${i}`)) {
+        participants.push({
+          name: formData.get(`name_${i}`)?.toString() || '',
+          jenisKelamin: formData.get(`jenisKelamin_${i}`)?.toString() || '',
+          jenisId: formData.get(`jenisId_${i}`)?.toString() || '',
+          nomorId: formData.get(`nomorId_${i}`)?.toString() || '',
+          ukuranJersey: formData.get(`ukuranJersey_${i}`)?.toString() || ''
+        });
+        i++;
       }
+
+      if (participants.length === 0 || !email || !phone) {
+        errorMsg = 'Data peserta, email, dan nomor WhatsApp wajib diisi!';
+      } else if (event.registered + participants.length > event.slots) {
+        errorMsg = 'Maaf, sisa kuota pendaftaran tidak mencukupi untuk jumlah peserta ini.';
+      } else {
+        // Gunakan harga asli event dari database
+        const basePrice = event.price;
+        const totalBase = basePrice * participants.length;
+
+        // Store participants as JSON string in the name field to avoid DB schema changes
+        const nameField = JSON.stringify(participants);
+
+        // Buat pendaftaran baru dengan status PENDING
+        const regId = await createRegistration({
+          eventId: event.id,
+          name: nameField,
+          email,
+          phone,
+          status: 'PENDING',
+          amount: totalBase,
+          paymentMethod: 'QRIS',
+          checkedIn: false
+        });
+
+        if (regId) {
+          // Gunakan ID Registrasi sebagai kode unik (mulai dari 1)
+          const uniqueCode = regId;
+          const finalAmount = totalBase + uniqueCode;
+          await updateRegistrationAmount(regId, finalAmount);
+          
+          return Astro.redirect(`/checkout/${regId}`);
+        } else {
+          errorMsg = 'Gagal memproses pendaftaran. Silakan coba lagi.';
+        }
+      }
+    } catch (err) {
+      errorMsg = 'Terjadi kesalahan saat memproses pendaftaran.';
+      console.error(err);
     }
-  } catch (err) {
-    errorMsg = 'Terjadi kesalahan saat memproses pendaftaran.';
-    console.error(err);
   }
 }
 
@@ -134,6 +141,11 @@ const isFinished = event.status === 'FINISHED';
                   <strong>Event Telah Selesai</strong>
                   <p>Pendaftaran sudah ditutup untuk event ini.</p>
                 </div>
+              ) : !isRegistrationOpen ? (
+                <div class="status-alert alert-danger text-center" style="padding: 2rem;">
+                  <strong>Pendaftaran Belum Dibuka</strong>
+                  <p style="margin-top: 0.5rem; font-size: 1.1rem;">Pendaftaran akan dibuka pada tanggal 31 Juli 2026 pukul 08:00 WIB.</p>
+                </div>
               ) : isFull ? (
                 <div class="status-alert alert-danger text-center">
                   <strong>Kuota Penuh</strong>
@@ -147,7 +159,7 @@ const isFinished = event.status === 'FINISHED';
                   <div class="participant-container" id="participants-container">
                     <!-- Participant 1 -->
                     <div class="participant-block" data-index="1">
-                      <h4 class="form-section-title">Data Peserta 1</h4>
+                      <h4 class="form-section-title">Data Peserta</h4>
                       
                       <div class="form-group">
                         <label for="name_1">Nama Lengkap (Sesuai ID)</label>
@@ -182,10 +194,7 @@ const isFinished = event.status === 'FINISHED';
                     </div>
                   </div>
 
-                  <div class="add-participant-row mt-4">
-                    <button type="button" id="add-participant-btn" class="btn btn-accent btn-sm">+ Tambah Peserta</button>
-                    <button type="button" id="remove-participant-btn" class="btn btn-danger btn-sm" style="display: none;">- Kurangi Peserta</button>
-                  </div>
+
                   <input type="hidden" id="jumlah_peserta" name="jumlah_peserta" value="1" />
                   
                   <hr style="border-color: rgba(255,255,255,0.1); margin: 2rem 0;" />
@@ -220,7 +229,7 @@ const isFinished = event.status === 'FINISHED';
 
                   <div id="jersey-dropdowns-container">
                     <div class="form-group mt-3 jersey-select-block" data-index="1">
-                      <label for="ukuranJersey_1">Ukuran Jersey Peserta 1</label>
+                      <label for="ukuranJersey_1">Ukuran Jersey</label>
                       <select id="ukuranJersey_1" name="ukuranJersey_1" required>
                         <option value="S">S</option>
                         <option value="M">M</option>
@@ -253,15 +262,22 @@ const isFinished = event.status === 'FINISHED';
             </div>
           </div>
           
-          <!-- Kolom Ringkasan Kanan (Sticky Desktop) -->
-          {!isFinished && !isFull && (
-            <>
-              <div class="summary-column">
-                <div class="reg-card glass">
-                  <div class="price-header" style="margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px dashed rgba(255,255,255,0.2);">
-                    <span class="label">Biaya Pendaftaran</span>
-                    <span class="value price-tag">{formatPrice(event.price)}</span>
-                    <span style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">(Termasuk <strong>Wakaf Produktif</strong> sebesar Rp 30.000)</span>
+          <!-- Kolom Ringkasan Kanan (Sticky) -->
+          {!isFinished && !isFull && isRegistrationOpen && (
+            <div class="summary-column">
+              <div class="reg-card glass">
+                <div class="price-header" style="margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px dashed rgba(255,255,255,0.2);">
+                  <span class="label">Biaya Pendaftaran</span>
+                  <span class="value price-tag">{formatPrice(event.price)}</span>
+                  <span style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">(Termasuk <strong>Wakaf Produktif</strong> sebesar Rp 30.000)</span>
+
+                </div>
+                
+                <h4 class="form-section-title">Ringkasan Pesanan</h4>
+                <div class="category-card selected mt-3">
+                  <div class="category-info">
+                    <span class="cat-name">{event.title}</span>
+                    <span class="cat-price text-accent" id="summary-price" data-price={event.price}>{formatPrice(event.price)}</span>
                   </div>
                   
                   <h4 class="form-section-title">Ringkasan Pesanan</h4>
@@ -336,103 +352,7 @@ const isFinished = event.status === 'FINISHED';
                       }
                     }
                     
-                    if (addBtn) {
-                      addBtn.addEventListener('click', () => {
-                        participantCount++;
-                        const template = `
-                          <div class="participant-block" data-index="${participantCount}" style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px dashed rgba(148, 163, 184, 0.35);">
-                            <h4 class="form-section-title">Data Peserta ${participantCount}</h4>
-                            <div class="form-group">
-                              <label for="name_${participantCount}">Nama Lengkap</label>
-                              <input type="text" id="name_${participantCount}" name="name_${participantCount}" required placeholder="Isi Nama sesuai ID Card Anda" />
-                            </div>
-                            <div class="form-row mt-3">
-                              <div class="form-group half">
-                                <label for="jenisKelamin_${participantCount}">Jenis Kelamin</label>
-                                <select id="jenisKelamin_${participantCount}" name="jenisKelamin_${participantCount}" required>
-                                  <option value="Pria">Pria</option>
-                                  <option value="Wanita">Wanita</option>
-                                </select>
-                              </div>
-                              <div class="form-group half">
-                                <label for="jenisId_${participantCount}">Jenis ID</label>
-                                <select id="jenisId_${participantCount}" name="jenisId_${participantCount}" required>
-                                  <option value="KTP">KTP</option>
-                                  <option value="SIM">SIM</option>
-                                  <option value="Paspor">Paspor</option>
-                                  <option value="Kartu Pelajar">Kartu Pelajar</option>
-                                </select>
-                              </div>
-                            </div>
-                            <div class="form-group mt-3">
-                              <label for="nomorId_${participantCount}">Nomor ID</label>
-                              <input type="text" id="nomorId_${participantCount}" name="nomorId_${participantCount}" required placeholder="Isi dengan Nomor NIK Anda" />
-                            </div>
-                          </div>
-                        `;
-                        const jerseyTemplate = `
-                          <div class="form-group mt-3 jersey-select-block" data-index="${participantCount}">
-                            <label for="ukuranJersey_${participantCount}">Ukuran Jersey Peserta ${participantCount}</label>
-                            <select id="ukuranJersey_${participantCount}" name="ukuranJersey_${participantCount}" required>
-                              <option value="S">S</option>
-                              <option value="M">M</option>
-                              <option value="L">L</option>
-                              <option value="XL">XL</option>
-                              <option value="XXL">XXL</option>
-                            </select>
-                          </div>
-                        `;
-                        if (container) container.insertAdjacentHTML('beforeend', template);
-                        const jerseyContainer = document.getElementById('jersey-dropdowns-container');
-                        if (jerseyContainer) jerseyContainer.insertAdjacentHTML('beforeend', jerseyTemplate);
-                        updateSummary();
-                      });
-                    }
-                    
-                    if (removeBtn) {
-                      removeBtn.addEventListener('click', () => {
-                        if (participantCount > 1) {
-                          if (container) {
-                            const block = container.querySelector(`.participant-block[data-index="${participantCount}"]`);
-                            if (block) {
-                              block.remove();
-                              
-                              const jerseyContainer = document.getElementById('jersey-dropdowns-container');
-                              if (jerseyContainer) {
-                                const jerseyBlock = jerseyContainer.querySelector(`.jersey-select-block[data-index="${participantCount}"]`);
-                                if (jerseyBlock) jerseyBlock.remove();
-                              }
-                              
-                              participantCount--;
-                              updateSummary();
-                            }
-                          }
-                        }
-                      });
-                    }
 
-                    // IntersectionObserver to hide mobile sticky bar & shift WhatsApp logo when summary-column is in view
-                    const summaryCol = document.querySelector('.summary-column');
-                    const stickyBar = document.querySelector('.mobile-sticky-bar');
-                    const floatingWa = document.querySelector('.floating-wa');
-
-                    if (summaryCol && stickyBar && 'IntersectionObserver' in window) {
-                      const observer = new IntersectionObserver((entries) => {
-                        entries.forEach(entry => {
-                          if (entry.isIntersecting) {
-                            stickyBar.classList.add('is-hidden');
-                            if (floatingWa) floatingWa.classList.remove('has-sticky-bar');
-                          } else {
-                            stickyBar.classList.remove('is-hidden');
-                            if (floatingWa) floatingWa.classList.add('has-sticky-bar');
-                          }
-                        });
-                      }, {
-                        threshold: 0.15
-                      });
-
-                      observer.observe(summaryCol);
-                    }
                   });
                 </script>
 
