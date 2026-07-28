@@ -253,37 +253,50 @@ const isFinished = event.status === 'FINISHED';
             </div>
           </div>
           
-          <!-- Kolom Ringkasan Kanan (Sticky) -->
+          <!-- Kolom Ringkasan Kanan (Sticky Desktop) -->
           {!isFinished && !isFull && (
-            <div class="summary-column">
-              <div class="reg-card glass">
-                <div class="price-header" style="margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px dashed rgba(255,255,255,0.2);">
-                  <span class="label">Biaya Pendaftaran</span>
-                  <span class="value price-tag">{formatPrice(event.price)}</span>
-                  <span style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">(Termasuk <strong>Wakaf Produktif</strong> sebesar Rp 30.000)</span>
-
-                </div>
-                
-                <h4 class="form-section-title">Ringkasan Pesanan</h4>
-                <div class="category-card selected mt-3">
-                  <div class="category-info">
-                    <span class="cat-name">{event.title}</span>
-                    <span class="cat-type">Total Peserta: <span id="summary-qty">1</span> Orang</span>
-                    <span class="cat-price text-accent" id="summary-price" data-price={event.price}>{formatPrice(event.price)}</span>
+            <>
+              <div class="summary-column">
+                <div class="reg-card glass">
+                  <div class="price-header" style="margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px dashed rgba(255,255,255,0.2);">
+                    <span class="label">Biaya Pendaftaran</span>
+                    <span class="value price-tag">{formatPrice(event.price)}</span>
+                    <span style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">(Termasuk <strong>Wakaf Produktif</strong> sebesar Rp 30.000)</span>
                   </div>
-                  <div class="category-badge">
-                    <span class="badge-text">{event.category}</span>
+                  
+                  <h4 class="form-section-title">Ringkasan Pesanan</h4>
+                  <div class="category-card selected mt-3">
+                    <div class="category-info">
+                      <span class="cat-name">{event.title}</span>
+                      <span class="cat-type">Total Peserta: <span id="summary-qty">1</span> Orang</span>
+                      <span class="cat-price text-accent" id="summary-price" data-price={event.price}>{formatPrice(event.price)}</span>
+                    </div>
+                    <div class="category-badge">
+                      <span class="badge-text">{event.category}</span>
+                    </div>
                   </div>
+                  
+                  <div class="summary-extra" style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-top: 1rem; border-top: 1px dashed rgba(255,255,255,0.2); padding-top: 1rem;">
+                    <span class="text-secondary">Fasilitas Jersey</span>
+                    <span style="color: var(--success); font-weight: 600;">TERMASUK</span>
+                  </div>
+                  
+                  <button type="submit" class="btn btn-accent btn-block submit-btn mt-4">Konfirmasi Pesanan</button>
                 </div>
-                
-                <div class="summary-extra" style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-top: 1rem; border-top: 1px dashed rgba(255,255,255,0.2); padding-top: 1rem;">
-                  <span class="text-secondary">Fasilitas Jersey</span>
-                  <span style="color: var(--success); font-weight: 600;">TERMASUK</span>
-                </div>
-                
-                <button type="submit" class="btn btn-accent btn-block submit-btn mt-4">Konfirmasi Pesanan</button>
               </div>
-            </div>
+
+              <!-- Sticky Bottom Bar (Mobile Only) -->
+              <div class="mobile-sticky-bar glass">
+                <div class="mobile-sticky-info">
+                  <span class="mobile-sticky-label">Total Biaya (<span id="mobile-summary-qty">1</span> Peserta)</span>
+                  <span class="mobile-sticky-price" id="mobile-summary-price" data-price={event.price}>{formatPrice(event.price)}</span>
+                  <span class="mobile-sticky-wakaf">(Termasuk <strong>Wakaf Produktif</strong> Rp 30.000)</span>
+                </div>
+                <button type="submit" class="btn btn-accent mobile-sticky-btn">
+                  Konfirmasi Pesanan
+                </button>
+              </div>
+            </>
           )}
         </div>
       </form>
@@ -295,18 +308,23 @@ const isFinished = event.status === 'FINISHED';
                     const removeBtn = document.getElementById('remove-participant-btn');
                     const qtySpan = document.getElementById('summary-qty');
                     const priceSpan = document.getElementById('summary-price');
+                    const mobileQtySpan = document.getElementById('mobile-summary-qty');
+                    const mobilePriceSpan = document.getElementById('mobile-summary-price');
                     const qtyInput = document.getElementById('jumlah_peserta') as HTMLInputElement | null;
                     
                     let participantCount = 1;
-                    const basePrice = priceSpan ? parseInt(priceSpan.getAttribute('data-price') || '0', 10) : 0;
+                    const basePrice = priceSpan ? parseInt(priceSpan.getAttribute('data-price') || '0', 10) : (mobilePriceSpan ? parseInt(mobilePriceSpan.getAttribute('data-price') || '0', 10) : 0);
                     
                     function formatRupiah(angka: number) {
                       return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
                     }
                     
                     function updateSummary() {
+                      const formattedPrice = formatRupiah(participantCount * basePrice);
                       if (qtySpan) qtySpan.textContent = participantCount.toString();
-                      if (priceSpan) priceSpan.textContent = formatRupiah(participantCount * basePrice);
+                      if (priceSpan) priceSpan.textContent = formattedPrice;
+                      if (mobileQtySpan) mobileQtySpan.textContent = participantCount.toString();
+                      if (mobilePriceSpan) mobilePriceSpan.textContent = formattedPrice;
                       if (qtyInput) qtyInput.value = participantCount.toString();
                       
                       if (removeBtn) {
@@ -391,6 +409,29 @@ const isFinished = event.status === 'FINISHED';
                           }
                         }
                       });
+                    }
+
+                    // IntersectionObserver to hide mobile sticky bar & shift WhatsApp logo when summary-column is in view
+                    const summaryCol = document.querySelector('.summary-column');
+                    const stickyBar = document.querySelector('.mobile-sticky-bar');
+                    const floatingWa = document.querySelector('.floating-wa');
+
+                    if (summaryCol && stickyBar && 'IntersectionObserver' in window) {
+                      const observer = new IntersectionObserver((entries) => {
+                        entries.forEach(entry => {
+                          if (entry.isIntersecting) {
+                            stickyBar.classList.add('is-hidden');
+                            if (floatingWa) floatingWa.classList.remove('has-sticky-bar');
+                          } else {
+                            stickyBar.classList.remove('is-hidden');
+                            if (floatingWa) floatingWa.classList.add('has-sticky-bar');
+                          }
+                        });
+                      }, {
+                        threshold: 0.15
+                      });
+
+                      observer.observe(summaryCol);
                     }
                   });
                 </script>
@@ -976,10 +1017,96 @@ const isFinished = event.status === 'FINISHED';
     text-align: center;
   }
 
+  .mobile-sticky-bar {
+    display: none;
+  }
+
   @media (max-width: 1024px) {
+    .mobile-sticky-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 999;
+      background: #ffffff;
+      padding: 0.85rem 1.25rem;
+      border-top: 1px solid rgba(148, 163, 184, 0.35);
+      box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.12);
+      backdrop-filter: blur(10px);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .mobile-sticky-bar.is-hidden {
+      transform: translateY(100%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .mobile-sticky-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .mobile-sticky-label {
+      font-size: 0.78rem;
+      color: #64748b;
+      font-weight: 600;
+    }
+
+    .mobile-sticky-price {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--accent);
+      line-height: 1.2;
+    }
+
+    .mobile-sticky-wakaf {
+      font-size: 0.68rem;
+      color: #64748b;
+      line-height: 1.2;
+      margin-top: 0.1rem;
+      display: block;
+    }
+
+    .mobile-sticky-wakaf strong {
+      color: #334155;
+      font-weight: 600;
+    }
+
+    .mobile-sticky-btn {
+      padding: 0.75rem 1.25rem;
+      font-size: 0.95rem;
+      font-weight: 700;
+      border-radius: var(--radius-md);
+      box-shadow: 0 4px 14px rgba(232, 186, 70, 0.35);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .event-detail-section {
+      padding-bottom: 3rem;
+    }
+
     .detail-grid {
       grid-template-columns: 1fr;
       gap: 3rem;
+    }
+
+    .floating-wa {
+      transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s ease, box-shadow 0.3s ease !important;
+    }
+
+    .floating-wa.has-sticky-bar {
+      bottom: 90px !important;
     }
   }
 </style>
