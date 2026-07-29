@@ -14,14 +14,14 @@ const {
   title,
   description = "Syiar QRIS Run 2026 adalah ajang lari resmi yang diselenggarakan oleh Bank Indonesia Kediri di Kediri Town Square pada 16 Agustus 2026. Daftar sekarang untuk mendukung digitalisasi pembayaran QRIS dan gaya hidup sehat!",
   image = "/logo.webp",
-  canonicalURL = new URL(Astro.url.pathname, Astro.site || "https://qrisrun.web.id"),
+  canonicalURL = new URL(Astro.url.pathname, Astro.site || "https://qrisrun.com"),
   type = "website",
   noindex = false,
   keywords = "Syiar QRIS Run, Syiar QRIS Run 2026, QRIS Run Kediri, Bank Indonesia Kediri, event lari Kediri 2026, fun run Kediri, daftar syiar qris run, event olahraga Jawa Timur, QRIS Bank Indonesia, lomba lari 2026",
   schemaType = "WebSite",
 } = Astro.props;
 
-const siteUrl = (Astro.site || new URL("https://qrisrun.web.id")).toString().replace(/\/$/, "");
+const siteUrl = (Astro.site || new URL("https://qrisrun.com")).toString().replace(/\/$/, "");
 const absoluteImageUrl = image.startsWith("http") ? image : `${siteUrl}${image.startsWith("/") ? "" : "/"}${image}`;
 const absoluteCanonicalUrl = typeof canonicalURL === "string" ? canonicalURL : canonicalURL.toString();
 
@@ -72,7 +72,7 @@ const eventSchema = {
   "offers": {
     "@type": "Offer",
     "url": `${siteUrl}/events/1`,
-    "price": "150000",
+    "price": "81000",
     "priceCurrency": "IDR",
     "availability": "https://schema.org/InStock",
     "validFrom": "2026-01-01T00:00:00+07:00"

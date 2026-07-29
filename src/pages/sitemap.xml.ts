@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import { getUpcomingEvents, getFinishedEvents } from '../lib/db';
 
 export const GET: APIRoute = async ({ site }) => {
-  const baseUrl = (site || 'https://qrisrun.web.id').toString().replace(/\/$/, '');
+  const baseUrl = (site || 'https://qrisrun.com').toString().replace(/\/$/, '');
   
   const staticPages = [
     { url: '', priority: '1.0', changefreq: 'daily' },
