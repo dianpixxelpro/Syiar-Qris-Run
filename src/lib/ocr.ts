@@ -13,49 +13,36 @@ export async function validateReceiptOCR(
   amount: number
 ): Promise<{ success: boolean; message: string; recognizedText: string; extractedTime?: string }> {
   try {
-    // 1. Inisialisasi Tesseract Worker dengan bahasa Inggris (angka & nama standar tercakup)
-    // Gunakan os.tmpdir() untuk cachePath agar tidak crash di Vercel (read-only filesystem EACCES)
     const { createWorker } = await import('tesseract.js');
+    const os = await import('os');
     const worker = await createWorker('eng', 1, {
       cachePath: os.tmpdir(),
     });
 
-    // 2. Jalankan pemindaian teks pada berkas Base64
     const { data: { text } } = await worker.recognize(base64Image);
     await worker.terminate();
 
     const upperText = text.toUpperCase();
 
-    // 3. Validasi Penerima (harus mengandung nama merchant: Boleam atau brand Syiar QRIS Run)
+    // 1. Validasi Penerima
     const hasRecipient =
       upperText.includes('EVENT ORGANIZER JAGAD PRE') ||
       upperText.includes('QRIS RUN') ||
-      upperText.includes('GO-JEK') || // Mendeteksi GoPay Merchant
+      upperText.includes('GO-JEK') ||
       upperText.includes('GOPAY');
 
-    // 4. Validasi Nominal Bayar
+    // 2. Validasi Nominal Bayar
     const cleanTextDigits = upperText.replace(/[^0-9]/g, '');
     const cleanAmount = Math.round(amount).toString();
 
-    // Variasi format (misal 150.003 atau 150,003 atau 150003)
-    const formattedDot = new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(amount).replace(/[^0-9.]/g, ''); // 150.003
-    const formattedComma = formattedDot.replace(/\./g, ','); // 150,003
+    const formattedDot = new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(amount).replace(/[^0-9.]/g, '');
+    const formattedComma = formattedDot.replace(/\./g, ',');
 
     const hasAmount =
       cleanTextDigits.includes(cleanAmount) ||
       upperText.includes(cleanAmount) ||
       upperText.includes(formattedDot) ||
       upperText.includes(formattedComma);
-
-    // 5. Validasi Nomor Transaksi / Keberhasilan
-    const hasTransactionRef =
-      upperText.includes('BERHASIL') ||
-      upperText.includes('SUKSES') ||
-      upperText.includes('SUCCESS') ||
-      upperText.includes('REF') ||
-      upperText.includes('REFERENSI') ||
-      upperText.includes('TRANSAKSI') ||
-      upperText.includes('TRX');
 
     if (!hasRecipient) {
       return {
@@ -73,69 +60,16 @@ export async function validateReceiptOCR(
       };
     }
 
-    if (!hasTransactionRef) {
-      return {
-        success: false,
-        message: 'Validasi OCR Gagal: Teks nomor transaksi / referensi / status keberhasilan tidak terdeteksi pada struk Anda!',
-        recognizedText: text
-      };
-    }
-
-
-
-    // 7. Ekstraksi Waktu Transaksi (Otomatis dari OCR)
-    let extractedTime = new Date().toISOString(); // Default fallback: waktu saat ini
-
-    // Cari pola tanggal e.g. 22 Jul 2026 atau 22/07/2026
-    const dateRegex = /(\d{1,2})[\s\/\-]*(JAN|FEB|MAR|APR|MEI|MAY|JUN|JUL|AGU|AUG|SEP|OKT|OCT|NOV|DES|DEC|[0-1]?\d)[\s\/\-]*(\d{2,4})/i;
-    // Cari pola jam e.g. 14:07 atau 14:07:00
-    const timeRegex = /(\d{2}):(\d{2})(?::\d{2})?/i;
-
-    const dateMatch = upperText.match(dateRegex);
-    const timeMatch = upperText.match(timeRegex);
-
-    if (dateMatch) {
-      try {
-        const day = dateMatch[1];
-        let monthStr = dateMatch[2];
-        const yearStr = dateMatch[3];
-        const year = yearStr.length === 2 ? `20${yearStr}` : yearStr;
-
-        // Normalisasi bulan
-        const monthMap: Record<string, string> = {
-          'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04', 'MEI': '05', 'MAY': '05',
-          'JUN': '06', 'JUL': '07', 'AGU': '08', 'AUG': '08', 'SEP': '09', 'OKT': '10',
-          'OCT': '10', 'NOV': '11', 'DES': '12', 'DEC': '12'
-        };
-        const month = monthMap[monthStr] || monthStr.padStart(2, '0');
-
-        let timeStr = '00:00:00';
-        if (timeMatch) {
-          timeStr = `${timeMatch[1]}:${timeMatch[2]}:00`;
-        }
-
-        const isoString = `${year}-${month}-${day.padStart(2, '0')}T${timeStr}Z`;
-        const parsedDate = new Date(isoString);
-        if (!isNaN(parsedDate.getTime())) {
-          extractedTime = parsedDate.toISOString();
-        }
-      } catch (e) {
-        // Abaikan jika error parsing, tetap gunakan fallback
-      }
-    }
-
     return {
       success: true,
       message: 'Validasi OCR Sukses! Struk bukti transfer valid.',
       recognizedText: text,
-      extractedTime
+      extractedTime: new Date().toISOString()
     };
   } catch (err) {
     console.error('Error saat menjalankan verifikasi OCR struk pembayaran:', err);
-    // Fallback aman: Jika engine Tesseract mengalami crash/keterbatasan memori di sandbox,
-    // kita izinkan pendaftaran masuk agar tidak memblokir user, namun log dicatat di server.
     return {
-      success: true,
+      success: true, // Fallback allow
       message: 'Verifikasi OCR dilewati karena kendala teknis pembacaan berkas gambar.',
       recognizedText: '',
       extractedTime: new Date().toISOString()

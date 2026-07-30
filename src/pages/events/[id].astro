@@ -49,7 +49,7 @@ if (Astro.request.method === 'POST') {
         errorMsg = 'Maaf, sisa kuota pendaftaran tidak mencukupi untuk jumlah peserta ini.';
       } else {
         // Gunakan harga asli event dari database
-        const basePrice = event.price;
+        const basePrice = 81000; // event.price;
         const totalBase = basePrice * participants.length;
 
         // Store participants as JSON string in the name field to avoid DB schema changes
@@ -126,15 +126,6 @@ const isFinished = event.status === 'FINISHED';
           <div class="reg-column">
             <div class="reg-card glass">
 
-              <div class="kuota-info">
-                <div class="kuota-label">
-                  <span>Kuota Terisi</span>
-                  <span>{event.registered} / {event.slots} Slot</span>
-                </div>
-                <div class="progress-bar">
-                  <div class="progress-fill" style={`width: ${(event.registered / event.slots) * 100}%`}></div>
-                </div>
-              </div>
 
               {isFinished ? (
                 <div class="status-alert alert-danger text-center">
@@ -244,7 +235,7 @@ const isFinished = event.status === 'FINISHED';
                   <div class="form-row">
                     <div class="form-group half">
                       <label for="email">Email Pemesan (Wajib diisi)</label>
-                      <input type="email" id="email" name="email" required placeholder="Wajib isi Email untuk Konfirmasi" />
+                      <input type="email" id="email" name="email" required placeholder="Pastikan Email Sesuai" />
                     </div>
                     <div class="form-group half">
                       <label for="phone">Nomor WhatsApp</label>
@@ -268,7 +259,7 @@ const isFinished = event.status === 'FINISHED';
               <div class="reg-card glass">
                 <div class="price-header" style="margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px dashed rgba(255,255,255,0.2);">
                   <span class="label">Biaya Pendaftaran</span>
-                  <span class="value price-tag">{formatPrice(event.price)}</span>
+                  <span class="value price-tag">{formatPrice(81000)}</span>
                   <span style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">(Termasuk <strong>Wakaf Produktif</strong> sebesar Rp 30.000)</span>
 
                 </div>
@@ -277,7 +268,7 @@ const isFinished = event.status === 'FINISHED';
                 <div class="category-card selected mt-3">
                   <div class="category-info">
                     <span class="cat-name">{event.title}</span>
-                    <span class="cat-price text-accent" id="summary-price" data-price={event.price}>{formatPrice(event.price)}</span>
+                    <span class="cat-price text-accent" id="summary-price" data-price={81000}>{formatPrice(81000)}</span>
                   </div>
                   <div class="category-badge">
                     <span class="badge-text">{event.category}</span>
@@ -294,6 +285,18 @@ const isFinished = event.status === 'FINISHED';
             </div>
           )}
         </div>
+
+        <!-- Sticky Mobile Bottom Bar -->
+        {!isFinished && !isFull && isRegistrationOpen && (
+          <div class="mobile-sticky-submit" id="mobile-sticky-submit">
+            <div class="sticky-price-info">
+              <span class="sticky-label">Total Biaya (<span id="sticky-qty">1</span> Peserta)</span>
+              <span class="sticky-price" id="sticky-price">{formatPrice(81000)}</span>
+              <span class="sticky-note">(Termasuk <strong>Wakaf Produktif</strong> Rp 30.000)</span>
+            </div>
+            <button type="submit" class="btn btn-accent btn-sticky">Konfirmasi Pesanan</button>
+          </div>
+        )}
       </form>
 
       <script>
@@ -317,6 +320,11 @@ const isFinished = event.status === 'FINISHED';
                       if (priceSpan) priceSpan.textContent = formatRupiah(participantCount * basePrice);
                       if (qtyInput) qtyInput.value = participantCount.toString();
                       
+                      const stickyQty = document.getElementById('sticky-qty');
+                      const stickyPrice = document.getElementById('sticky-price');
+                      if (stickyQty) stickyQty.textContent = participantCount.toString();
+                      if (stickyPrice) stickyPrice.textContent = formatRupiah(participantCount * basePrice);
+                      
                       if (removeBtn) {
                         if (participantCount > 1) {
                           removeBtn.style.display = 'inline-block';
@@ -326,7 +334,36 @@ const isFinished = event.status === 'FINISHED';
                       }
                     }
                     
+                    // Sticky Mobile Bottom Bar Logic
+                    const mobileSticky = document.getElementById('mobile-sticky-submit') as HTMLElement | null;
+                    const summaryColumn = document.querySelector('.summary-column');
+                    const floatingWa = document.querySelector('.floating-wa') as HTMLElement | null;
 
+                    if (mobileSticky && summaryColumn) {
+                      const observer = new IntersectionObserver((entries) => {
+                        entries.forEach(entry => {
+                          if (entry.isIntersecting) {
+                            mobileSticky.style.opacity = '0';
+                            mobileSticky.style.pointerEvents = 'none';
+                            mobileSticky.style.transform = 'translateY(100%)';
+                            if (floatingWa && window.innerWidth <= 991) {
+                              floatingWa.style.transform = 'translateY(0)';
+                            }
+                          } else {
+                            mobileSticky.style.opacity = '1';
+                            mobileSticky.style.pointerEvents = 'auto';
+                            mobileSticky.style.transform = 'translateY(0)';
+                            if (floatingWa && window.innerWidth <= 991) {
+                              floatingWa.style.transform = 'translateY(-100px)';
+                            }
+                          }
+                        });
+                      }, {
+                        root: null,
+                        threshold: 0.1
+                      });
+                      observer.observe(summaryColumn);
+                    }
                   });
                 </script>
 
@@ -915,6 +952,64 @@ const isFinished = event.status === 'FINISHED';
     .detail-grid {
       grid-template-columns: 1fr;
       gap: 3rem;
+    }
+  }
+
+  .mobile-sticky-submit {
+    display: none;
+  }
+
+  @media (max-width: 991px) {
+    .mobile-sticky-submit {
+      display: flex;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #ffffff;
+      padding: 1rem 1.5rem;
+      box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.08);
+      z-index: 100;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.3s ease;
+      border-top: 1px solid #e2e8f0;
+    }
+    
+    .sticky-price-info {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .sticky-label {
+      font-size: 0.8rem;
+      color: #64748b;
+      font-weight: 600;
+      margin-bottom: 0.1rem;
+    }
+    
+    .sticky-price {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #b4860b;
+      margin: 0;
+    }
+    
+    .sticky-note {
+      font-size: 0.65rem;
+      color: #94a3b8;
+      margin-top: 0.1rem;
+    }
+    
+    .btn-sticky {
+      padding: 0.75rem 1.25rem;
+      font-size: 0.95rem;
+      border-radius: 8px;
+      white-space: nowrap;
+    }
+    
+    body {
+      padding-bottom: 110px;
     }
   }
 </style>

@@ -389,6 +389,27 @@ const parseName = (nameStr: string) => {
                   style="padding: 0.3rem; font-size: 0.8rem; height: auto;"
                 />
               </div>
+
+              <input
+                type="text"
+                id="filter-name"
+                class="form-control"
+                placeholder="Cari Nama..."
+                style="padding: 0.3rem 0.6rem; font-size: 0.8rem; height: auto; border-radius: 6px; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: white;"
+              />
+              
+              <select
+                id="filter-status"
+                class="form-control"
+                style="padding: 0.3rem 0.6rem; font-size: 0.8rem; height: auto; border-radius: 6px; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: white;"
+              >
+                <option value="">Semua Status</option>
+                <option value="PENDING">PENDING</option>
+                <option value="PAID">PAID</option>
+                <option value="EXPIRED">EXPIRED</option>
+                <option value="CANCELLED">CANCELLED</option>
+              </select>
+
               <button
                 type="button"
                 id="btn-reset-filter"
@@ -908,16 +929,15 @@ const parseName = (nameStr: string) => {
   const filterDateEnd = document.getElementById(
     "filter-date-end",
   ) as HTMLInputElement;
+  const filterName = document.getElementById("filter-name") as HTMLInputElement;
+  const filterStatus = document.getElementById("filter-status") as HTMLSelectElement;
   const resetFilterBtn = document.getElementById("btn-reset-filter");
 
   const applyFilter = () => {
     const startStr = filterDateStart?.value;
     const endStr = filterDateEnd?.value;
-
-    if (!startStr && !endStr) {
-      tableRows.forEach((row) => ((row as HTMLElement).style.display = ""));
-      return;
-    }
+    const nameStr = filterName?.value.toLowerCase() || "";
+    const statusStr = filterStatus?.value || "";
 
     const startDate = startStr ? new Date(startStr).setHours(0, 0, 0, 0) : 0;
     const endDate = endStr
@@ -926,24 +946,40 @@ const parseName = (nameStr: string) => {
 
     tableRows.forEach((row) => {
       const dateRaw = row.getAttribute("data-date");
+      const nameRaw = row.getAttribute("data-raw-name")?.toLowerCase() || "";
+      const statusRaw = row.getAttribute("data-status") || "";
+      let isMatch = true;
+
       if (dateRaw) {
         const rowDate = new Date(dateRaw).getTime();
-        if (rowDate >= startDate && rowDate <= endDate) {
-          (row as HTMLElement).style.display = "";
-        } else {
-          (row as HTMLElement).style.display = "none";
+        if (rowDate < startDate || rowDate > endDate) {
+          isMatch = false;
         }
       }
+
+      if (nameStr && !nameRaw.includes(nameStr)) {
+        isMatch = false;
+      }
+
+      if (statusStr && statusRaw !== statusStr) {
+        isMatch = false;
+      }
+
+      (row as HTMLElement).style.display = isMatch ? "" : "none";
     });
   };
 
-  if (filterDateStart && filterDateEnd && resetFilterBtn) {
+  if (filterDateStart && filterDateEnd && filterName && filterStatus && resetFilterBtn) {
     filterDateStart.addEventListener("change", applyFilter);
     filterDateEnd.addEventListener("change", applyFilter);
+    filterName.addEventListener("keyup", applyFilter);
+    filterStatus.addEventListener("change", applyFilter);
 
     resetFilterBtn.addEventListener("click", () => {
       filterDateStart.value = "";
       filterDateEnd.value = "";
+      filterName.value = "";
+      filterStatus.value = "";
       tableRows.forEach((row) => ((row as HTMLElement).style.display = ""));
     });
   }

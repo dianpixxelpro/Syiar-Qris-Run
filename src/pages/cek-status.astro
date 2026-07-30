@@ -1,0 +1,124 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getRegistrationByEmailAndName } from '../lib/db';
+
+let errorMsg = '';
+let email = '';
+let name = '';
+
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+  email = formData.get('email') as string;
+  name = formData.get('name') as string;
+
+  if (email && name) {
+    const reg = await getRegistrationByEmailAndName(email, name);
+    if (reg) {
+      if (reg.status === 'PAID') {
+        return Astro.redirect(`/ticket/${reg.id}`);
+      } else {
+        return Astro.redirect(`/checkout/${reg.id}`);
+      }
+    } else {
+      errorMsg = 'Data pendaftaran tidak ditemukan. Pastikan Email dan Nama Lengkap yang dimasukkan sudah benar sesuai saat pendaftaran.';
+    }
+  }
+}
+---
+
+<Layout title="Cek Status Pendaftaran">
+  <section class="cek-status-section">
+    <div class="container max-width-sm">
+      <div class="form-card glass">
+        <h1 class="page-title text-center">Cek Status Pendaftaran</h1>
+        <p class="page-desc text-center mb-4">
+          Masukkan Email dan Nama Lengkap yang Anda gunakan saat mendaftar untuk mengecek status atau melanjutkan proses pendaftaran Anda.
+        </p>
+
+        {errorMsg && <div class="alert alert-danger">{errorMsg}</div>}
+
+        <form method="POST" class="status-form">
+          <div class="form-group">
+            <label for="email">Email Pemesan</label>
+            <input type="email" id="email" name="email" class="form-control" value={email} required placeholder="Contoh: budi@email.com" />
+          </div>
+          <div class="form-group mt-3">
+            <label for="name">Nama Lengkap (Sesuai Pendaftaran)</label>
+            <input type="text" id="name" name="name" class="form-control" value={name} required placeholder="Contoh: Budi Santoso" />
+          </div>
+          <button type="submit" class="btn btn-primary btn-full mt-4">
+            Cek Status
+          </button>
+        </form>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .cek-status-section {
+    padding: 6rem 0;
+    min-height: calc(100vh - 140px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .max-width-sm {
+    max-width: 500px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .form-card {
+    padding: 2.5rem;
+    border-radius: var(--radius-lg);
+  }
+  .page-title {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+  }
+  .page-desc {
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+  .alert {
+    padding: 1rem;
+    border-radius: var(--radius-md);
+    margin-bottom: 1.5rem;
+  }
+  .alert-danger {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+  }
+  .status-form {
+    display: flex;
+    flex-direction: column;
+  }
+  .form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+  }
+  .form-control {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-md);
+    color: white;
+    font-family: inherit;
+    transition: all 0.3s ease;
+  }
+  .form-control:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.2);
+  }
+  .btn-full {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+</style>

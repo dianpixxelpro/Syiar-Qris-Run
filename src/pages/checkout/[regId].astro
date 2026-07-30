@@ -30,7 +30,7 @@ const totalPay = registration.amount;
 //Baris 259: <p>Batas waktu pembayaran 1 menit telah habis...</p>
 // Hitung Batas Waktu Pembayaran 20 Menit × 60 Detik × 1000 Milidetik
 const limitTime = new Date(registration.createdAt).getTime() + (20 * 60 * 1000);
-const isExpired = registration.status === 'EXPIRED' || (registration.status === 'PENDING' && Date.now() > limitTime);
+const isExpired = registration.status === 'EXPIRED' || (registration.status === 'PENDING' && !registration.paymentProof && Date.now() > limitTime);
 
 let successMsg = '';
 let errorMsg = '';
@@ -50,7 +50,7 @@ try {
 }
 
 if (Astro.url.searchParams.get('uploaded') === '1') {
-  successMsg = 'Bukti pembayaran berhasil dikirim! Pesanan Anda sedang menunggu konfirmasi dari Admin. Anda akan mendapat E-Tiket via email setelah pembayaran dikonfirmasi.';
+  successMsg = 'Bukti pembayaran berhasil dikirim! Pesanan Anda sedang menunggu konfirmasi dari Admin <strong style="color: #f59e0b;">(Max 48 Jam)</strong>. Anda akan mendapat E-Tiket via email setelah pembayaran dikonfirmasi.';
 }
 
 if (Astro.request.method === 'POST') {
@@ -169,8 +169,9 @@ if (staticQrisPayload) {
           <div id="limit-time-data" data-time={limitTime} style="display:none;"></div>
         </div>
       )}
-      <div class="checkout-details glass">
+      <div class={`checkout-details glass ${registration.paymentProof || isExpired ? 'single-column' : ''}`}>
         
+        {!registration.paymentProof && !isExpired && (
           <div class="qris-payment-box" id="panel-qris">
             <div class="qris-logo-header">
               <span class="logo-txt">QRIS</span>
@@ -195,7 +196,7 @@ if (staticQrisPayload) {
               ⚠️ <strong>Penting:</strong> Jika Anda mengunduh QRIS ini, pastikan Anda mentransfer sebelum batas waktu habis. Pembayaran yang dilakukan setelah waktu habis konfirmasi ke admin via WhatsApp.
             </div>
           </div>
-
+        )}
 
         <!-- Sisi Kanan: Form Upload Bukti -->
         <div class="payment-summary">
@@ -224,7 +225,7 @@ if (staticQrisPayload) {
 
           <div class="upload-area">
             {errorMsg && <div class="alert alert-danger" set:html={errorMsg}></div>}
-            {successMsg && <div class="alert alert-success">{successMsg}</div>}
+            {successMsg && <div class="alert alert-success" set:html={successMsg}></div>}
 
             {isExpired ? (
               <div class="waiting-box expired glass">
@@ -594,6 +595,12 @@ if (staticQrisPayload) {
     overflow: hidden;
     background: #ffffff;
     box-shadow: var(--shadow-lg);
+  }
+
+  .checkout-details.single-column {
+    grid-template-columns: 1fr;
+    max-width: 600px;
+    margin: 0 auto;
   }
 
   .bank-details-box, .qris-payment-box {

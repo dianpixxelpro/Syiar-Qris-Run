@@ -246,7 +246,7 @@ export async function getAllRegistrations(): Promise<(Registration & { eventTitl
     
     // Dynamic Expiration Check
     const limitTime = new Date(reg.createdAt).getTime() + (30 * 60 * 1000); // 30 menit
-    if (reg.status === 'PENDING' && Date.now() > limitTime) {
+    if (reg.status === 'PENDING' && !reg.paymentProof && Date.now() > limitTime) {
       reg.status = 'EXPIRED';
     }
 
@@ -285,7 +285,7 @@ export async function getRegistrationWithEventById(id: number): Promise<(Registr
 
   // Check TTL Expiration (30 Menit)
   const limitTime = new Date(reg.createdAt).getTime() + (30 * 60 * 1000);
-  if (reg.status === 'PENDING' && Date.now() > limitTime) {
+  if (reg.status === 'PENDING' && !reg.paymentProof && Date.now() > limitTime) {
     const { error: updateError } = await supabase
       .from('registrations')
       .update({ status: 'EXPIRED' })
@@ -439,19 +439,7 @@ export async function checkInRegistration(id: number): Promise<{ success: boolea
 }
 
 export async function uploadPaymentProof(id: number, base64Image: string, transactionTime: string): Promise<{ success: boolean; message: string }> {
-  // 1. Cek duplikasi gambar (jika gambar sama persis)
-  const { data: imageDupes } = await supabase
-    .from('registrations')
-    .select('id')
-    .eq('payment_proof', base64Image)
-    .not('id', 'eq', id);
-
-  if ((imageDupes && imageDupes.length > 0)) {
-    return {
-      success: false,
-      message: 'Bukti transfer ini sudah pernah digunakan oleh pendaftar lain! Pendaftaran ditolak atas indikasi kecurangan (Duplikasi).'
-    };
-  }
+  // Cek duplikasi dihapus atas permintaan pengguna
 
   // Update bukti transfer dan nomor transaksi
   const { error } = await supabase
@@ -480,4 +468,41 @@ export async function deleteRegistration(id: number): Promise<boolean> {
     return false;
   }
   return true;
+}
+
+export async function getRegistrationByEmailAndName(email: string, name: string): Promise<Registration | undefined> {
+  const { data, error } = await supabase
+    .from('registrations')
+    .select('*')
+    .eq('email', email)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error(`Error fetching registration for email ${email} and name ${name}:`, error);
+    return undefined;
+  }
+  
+  if (!data || data.length === 0) return undefined;
+
+  const targetName = name.trim().toLowerCase();
+  
+  for (const row of data) {
+    let rowNames: string[] = [];
+    try {
+      const parsed = JSON.parse(row.name);
+      if (Array.isArray(parsed)) {
+        rowNames = parsed.map(p => String(p.name || '').trim().toLowerCase());
+      } else {
+        rowNames = [String(row.name || '').trim().toLowerCase()];
+      }
+    } catch (e) {
+      rowNames = [String(row.name || '').trim().toLowerCase()];
+    }
+    
+    if (rowNames.includes(targetName)) {
+      return mapRegistration(row);
+    }
+  }
+  
+  return undefined;
 }
