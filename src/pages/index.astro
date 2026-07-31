@@ -3,10 +3,12 @@ import Layout from "../layouts/Layout.astro";
 import EventCard from "../components/EventCard.astro";
 import CTA from "../components/CTA.astro";
 import RuteComponent from "../components/Rute.astro";
-import { getUpcomingEvents, getFinishedEvents } from "../lib/db";
+import { getUpcomingEvents, getFinishedEvents, getEventById } from "../lib/db";
 
 const upcomingEvents = await getUpcomingEvents();
 const finishedEvents = await getFinishedEvents();
+const mainEvent = await getEventById(1);
+const isFull = mainEvent ? mainEvent.registered >= 1379 : false;
 
 // Cek apakah pendaftaran sudah dibuka (31 Juli 2026, 08:00 WIB)
 const registrationOpenDate = new Date('2026-07-31T08:00:00+07:00');
@@ -87,7 +89,12 @@ const categories = [
           >
         </div>
 
-        {isRegistrationOpen ? (
+        {isFull ? (
+          <div class="status-alert alert-danger text-center" style="margin: 2rem 0; padding: 1rem 2rem; border-radius: 12px; background: rgba(239, 68, 68, 0.9); border: 1px solid #f87171;">
+            <strong style="color: white; font-size: 1.25rem;">Kuota Penuh</strong>
+            <p style="color: white; margin-top: 0.5rem;">Maaf, pendaftaran telah ditutup karena kuota sudah terpenuhi.</p>
+          </div>
+        ) : isRegistrationOpen ? (
           <a
             href="/events/1"
             class="btn btn-accent btn-large"
@@ -99,9 +106,11 @@ const categories = [
             disabled>Dibuka 31 Juli 2026</button>
         )}
 
-        <p class="kuota-text" style="color: white;">
-          Kuota 1500 Peserta! daftar Sekarang Juga Sebelum Kuota Terpenuhi.
-        </p>
+        {!isFull && (
+          <p class="kuota-text" style="color: white;">
+            Kuota 1500 Peserta! daftar Sekarang Juga Sebelum Kuota Terpenuhi.
+          </p>
+        )}
       </div>
     </div>
 

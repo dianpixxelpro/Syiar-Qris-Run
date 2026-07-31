@@ -324,26 +324,31 @@ export async function updateRegistrationStatus(id: number, status: 'PENDING' | '
       return false;
     }
 
-    // Ambil detail event saat ini untuk meningkatkan registered count
-    const event = await getEventById(currentReg.eventId);
-    if (event) {
-      let participantCount = 1;
-      try {
-        const parsed = JSON.parse(currentReg.name);
-        if (Array.isArray(parsed)) {
-          participantCount = parsed.length;
+    // Jika sudah pernah upload bukti TF, kuota sudah ditambah saat upload
+    const alreadyIncremented = !!currentReg.paymentProof;
+
+    if (!alreadyIncremented) {
+      // Ambil detail event saat ini untuk meningkatkan registered count
+      const event = await getEventById(currentReg.eventId);
+      if (event) {
+        let participantCount = 1;
+        try {
+          const parsed = JSON.parse(currentReg.name);
+          if (Array.isArray(parsed)) {
+            participantCount = parsed.length;
+          }
+        } catch (e) {
+          // Fallback to 1 if not JSON
         }
-      } catch (e) {
-        // Fallback to 1 if not JSON
-      }
 
-      const { error: eventError } = await supabase
-        .from('events')
-        .update({ registered: event.registered + participantCount })
-        .eq('id', currentReg.eventId);
+        const { error: eventError } = await supabase
+          .from('events')
+          .update({ registered: event.registered + participantCount })
+          .eq('id', currentReg.eventId);
 
-      if (eventError) {
-        console.error(`Error incrementing registered count for event ${currentReg.eventId}:`, eventError);
+        if (eventError) {
+          console.error(`Error incrementing registered count for event ${currentReg.eventId}:`, eventError);
+        }
       }
     }
     return true;
@@ -440,6 +445,13 @@ export async function checkInRegistration(id: number): Promise<{ success: boolea
 
 export async function uploadPaymentProof(id: number, base64Image: string, transactionTime: string): Promise<{ success: boolean; message: string }> {
   // Cek duplikasi dihapus atas permintaan pengguna
+  
+  const currentReg = await getRegistrationById(id);
+  if (!currentReg) {
+    return { success: false, message: 'Registrasi tidak ditemukan.' };
+  }
+  
+  const isFirstTimeUpload = !currentReg.paymentProof;
 
   // Update bukti transfer dan nomor transaksi
   const { error } = await supabase
@@ -454,6 +466,32 @@ export async function uploadPaymentProof(id: number, base64Image: string, transa
     console.error(`Error uploading payment proof for registration ${id}:`, error);
     return { success: false, message: 'Gagal mengunggah bukti transfer ke database.' };
   }
+  
+  // Tambahkan kuota pendaftar secara otomatis jika ini adalah upload bukti transfer pertama kalinya
+  if (isFirstTimeUpload) {
+    const event = await getEventById(currentReg.eventId);
+    if (event) {
+      let participantCount = 1;
+      try {
+        const parsed = JSON.parse(currentReg.name);
+        if (Array.isArray(parsed)) {
+          participantCount = parsed.length;
+        }
+      } catch (e) {
+        // Fallback to 1 if not JSON
+      }
+
+      const { error: eventError } = await supabase
+        .from('events')
+        .update({ registered: event.registered + participantCount })
+        .eq('id', currentReg.eventId);
+
+      if (eventError) {
+        console.error(`Error incrementing registered count for event ${currentReg.eventId}:`, eventError);
+      }
+    }
+  }
+
   return { success: true, message: 'Bukti transfer berhasil dikirim!' };
 }
 
