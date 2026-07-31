@@ -557,6 +557,8 @@ const parseName = (nameStr: string) => {
                 </tbody>
               </table>
             </div>
+            
+            <div id="pagination-controls" style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 1.5rem; flex-wrap: wrap;"></div>
           ) : (
             <div class="empty-table">
               <p>Belum ada data pendaftar masuk.</p>
@@ -932,6 +934,45 @@ const parseName = (nameStr: string) => {
   const filterName = document.getElementById("filter-name") as HTMLInputElement;
   const filterStatus = document.getElementById("filter-status") as HTMLSelectElement;
   const resetFilterBtn = document.getElementById("btn-reset-filter");
+  const paginationControls = document.getElementById("pagination-controls");
+
+  let currentPage = 1;
+  const rowsPerPage = 200;
+  let matchedRows: HTMLElement[] = [];
+
+  const renderPagination = () => {
+    if (!paginationControls) return;
+    paginationControls.innerHTML = "";
+    const totalPages = Math.ceil(matchedRows.length / rowsPerPage);
+    if (totalPages <= 1) return;
+
+    for (let i = 1; i <= totalPages; i++) {
+      const btn = document.createElement("button");
+      btn.textContent = i.toString();
+      btn.className = `btn btn-sm ${i === currentPage ? "btn-primary" : "btn-outline"}`;
+      btn.style.padding = "0.3rem 0.7rem";
+      btn.style.fontSize = "0.85rem";
+      btn.addEventListener("click", () => {
+        currentPage = i;
+        renderPage();
+        renderPagination();
+      });
+      paginationControls.appendChild(btn);
+    }
+  };
+
+  const renderPage = () => {
+    // Hide all first
+    tableRows.forEach(row => ((row as HTMLElement).style.display = "none"));
+    
+    // Show only rows for current page
+    const startIdx = (currentPage - 1) * rowsPerPage;
+    const endIdx = startIdx + rowsPerPage;
+    
+    for (let i = startIdx; i < endIdx && i < matchedRows.length; i++) {
+      matchedRows[i].style.display = "";
+    }
+  };
 
   const applyFilter = () => {
     const startStr = filterDateStart?.value;
@@ -943,6 +984,8 @@ const parseName = (nameStr: string) => {
     const endDate = endStr
       ? new Date(endStr).setHours(23, 59, 59, 999)
       : Infinity;
+
+    matchedRows = [];
 
     tableRows.forEach((row) => {
       const dateRaw = row.getAttribute("data-date");
@@ -965,8 +1008,16 @@ const parseName = (nameStr: string) => {
         isMatch = false;
       }
 
-      (row as HTMLElement).style.display = isMatch ? "" : "none";
+      if (isMatch) {
+        matchedRows.push(row as HTMLElement);
+      } else {
+        (row as HTMLElement).style.display = "none";
+      }
     });
+
+    currentPage = 1;
+    renderPage();
+    renderPagination();
   };
 
   if (filterDateStart && filterDateEnd && filterName && filterStatus && resetFilterBtn) {
@@ -980,9 +1031,12 @@ const parseName = (nameStr: string) => {
       filterDateEnd.value = "";
       filterName.value = "";
       filterStatus.value = "";
-      tableRows.forEach((row) => ((row as HTMLElement).style.display = ""));
+      applyFilter();
     });
   }
+
+  // Initialize view
+  applyFilter();
 
   // Edit Registration Modal Logic
   const editRegModal = document.getElementById("editRegModal");
@@ -1477,10 +1531,6 @@ const parseName = (nameStr: string) => {
     border: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
     flex-direction: column;
-    height: calc(
-      100vh - 240px
-    ); /* Leave ample room for header and padding to kill outer scrollbar */
-    overflow: hidden;
   }
 
   .table-scroll {

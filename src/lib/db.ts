@@ -234,7 +234,8 @@ export async function getAllRegistrations(): Promise<(Registration & { eventTitl
         title
       )
     `)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(5000);
 
   if (error) {
     console.error('Error fetching all registrations:', error);
@@ -458,7 +459,8 @@ export async function uploadPaymentProof(id: number, base64Image: string, transa
     .from('registrations')
     .update({ 
       payment_proof: base64Image,
-      transaction_time: transactionTime
+      transaction_time: transactionTime,
+      status: 'PENDING'
     })
     .eq('id', id);
 
@@ -539,6 +541,51 @@ export async function getRegistrationByEmailAndName(email: string, name: string)
     
     if (rowNames.includes(targetName)) {
       return mapRegistration(row);
+    }
+  }
+  
+  return undefined;
+}
+
+export async function findRegistrationForUpload(
+  email: string,
+  phone: string,
+  name: string,
+  nomorId: string,
+  amount: number
+): Promise<Registration | undefined> {
+  const { data, error } = await supabase
+    .from('registrations')
+    .select('*')
+    .eq('email', email)
+    .eq('phone', phone)
+    .eq('amount', amount)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error(`Error fetching registration for upload validation:`, error);
+    return undefined;
+  }
+  
+  if (!data || data.length === 0) return undefined;
+
+  const targetName = name.trim().toLowerCase();
+  const targetId = nomorId.trim().toLowerCase();
+  
+  for (const row of data) {
+    try {
+      const parsed = JSON.parse(row.name);
+      if (Array.isArray(parsed)) {
+        for (const p of parsed) {
+          const pName = String(p.name || '').trim().toLowerCase();
+          const pId = String(p.nomorId || '').trim().toLowerCase();
+          if (pName === targetName && pId === targetId) {
+            return mapRegistration(row);
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore string-only names since we require nomorId now
     }
   }
   
