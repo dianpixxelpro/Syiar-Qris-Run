@@ -8,7 +8,7 @@ import { getUpcomingEvents, getFinishedEvents, getEventById } from "../lib/db";
 const upcomingEvents = await getUpcomingEvents();
 const finishedEvents = await getFinishedEvents();
 const mainEvent = await getEventById(1);
-const isFull = mainEvent ? mainEvent.registered >= 1379 : false;
+const isFull = true; // mainEvent ? mainEvent.registered >= 1379 : false;
 
 // Cek apakah pendaftaran sudah dibuka (31 Juli 2026, 08:00 WIB)
 const registrationOpenDate = new Date('2026-07-31T08:00:00+07:00');
@@ -91,8 +91,8 @@ const categories = [
 
         {isFull ? (
           <div class="status-alert alert-danger text-center" style="margin: 2rem 0; padding: 1rem 2rem; border-radius: 12px; background: rgba(239, 68, 68, 0.9); border: 1px solid #f87171;">
-            <strong style="color: white; font-size: 1.25rem;">Kuota Penuh</strong>
-            <p style="color: white; margin-top: 0.5rem;">Maaf, pendaftaran telah ditutup karena kuota sudah terpenuhi.</p>
+            <strong style="color: white; font-size: 1.25rem;">Kuota Pendaftar Terpenuhi</strong>
+            <p style="color: white; margin-top: 0.5rem;">Maaf, pendaftaran sementara ditutup untuk verifikasi data pendaftar.</p>
           </div>
         ) : isRegistrationOpen ? (
           <a

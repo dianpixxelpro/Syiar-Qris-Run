@@ -96,7 +96,7 @@ const formatPrice = (price: number) => {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
 };
 
-const isFull = event.registered >= 1379;
+const isFull = true; // event.registered >= 1379;
 const isFinished = event.status === 'FINISHED';
 ---
 
@@ -148,8 +148,8 @@ const isFinished = event.status === 'FINISHED';
                 </div>
               ) : isFull ? (
                 <div class="status-alert alert-danger text-center">
-                  <strong>Kuota Penuh</strong>
-                  <p>Maaf, slot pendaftaran telah habis terjual.</p>
+                  <strong>Kuota Sementara Terpenuhi</strong>
+                  <p>Maaf, Pendaftaran Sementara ditutup untuk verifikasi data pendaftar yang telah masuk.</p>
                 </div>
               ) : (
                 <div class="form-wrapper">
