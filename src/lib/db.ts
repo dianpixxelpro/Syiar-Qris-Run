@@ -235,7 +235,7 @@ export async function getAllRegistrations(): Promise<(Registration & { eventTitl
       )
     `)
     .order('created_at', { ascending: false })
-    .limit(5000);
+    .limit(1000);
 
   if (error) {
     console.error('Error fetching all registrations:', error);

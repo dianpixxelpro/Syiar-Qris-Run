@@ -1,0 +1,1 @@
+fetch('http://localhost:4321/mlebuodewe/admin/registrations').then(r => r.text()).then(t => { const match = t.match(/<table class="event-table">[\s\S]*?<\/table>/); if (match) { console.log('Table found! Rows:', (match[0].match(/<tr/g) || []).length - 1); } else { console.log('No table found, text length:', t.length); } });
