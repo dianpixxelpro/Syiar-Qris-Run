@@ -5,8 +5,8 @@ import nodemailer from 'nodemailer';
  * Pastikan EMAIL_USER dan EMAIL_APP_PASSWORD sudah diset di .env
  */
 function createTransporter() {
-  const emailUser = process.env.EMAIL_USER || import.meta.env.EMAIL_USER || '';
-  const emailPass = process.env.EMAIL_APP_PASSWORD || import.meta.env.EMAIL_APP_PASSWORD || '';
+  const emailUser = process.env.EMAIL_USER || (import.meta as any).env?.EMAIL_USER || '';
+  const emailPass = process.env.EMAIL_APP_PASSWORD || (import.meta as any).env?.EMAIL_APP_PASSWORD || '';
 
   if (!emailUser || !emailPass) {
     console.warn('[EMAIL] EMAIL_USER atau EMAIL_APP_PASSWORD belum dikonfigurasi di .env. Email tidak akan dikirim.');
@@ -23,7 +23,7 @@ function createTransporter() {
 }
 
 const FROM_NAME = 'Syiar QRIS Run';
-const BASE_URL = process.env.PUBLIC_BASE_URL || import.meta.env.PUBLIC_BASE_URL || 'http://localhost:4321';
+const BASE_URL = process.env.PUBLIC_BASE_URL || (import.meta as any).env?.PUBLIC_BASE_URL || 'http://localhost:4321';
 
 // ─────────────────────────────────────────
 // Template HTML Premium (Dark Theme)
@@ -138,7 +138,7 @@ export async function sendPaymentReceivedEmail(params: {
 
   try {
     await transporter.sendMail({
-      from: `"${FROM_NAME}" <${process.env.EMAIL_USER || import.meta.env.EMAIL_USER}>`,
+      from: `"${FROM_NAME}" <${process.env.EMAIL_USER || (import.meta as any).env?.EMAIL_USER}>`,
       to: params.to,
       subject: `[Syiar QRIS Run] Bukti Pembayaran Diterima — ${params.eventTitle}`,
       html: wrapEmailTemplate('Bukti Pembayaran Diterima', bodyHtml),
@@ -269,7 +269,7 @@ export async function sendTicketConfirmedEmail(params: {
 
   try {
     await transporter.sendMail({
-      from: `"${FROM_NAME}" <${process.env.EMAIL_USER || import.meta.env.EMAIL_USER}>`,
+      from: `"${FROM_NAME}" <${process.env.EMAIL_USER || (import.meta as any).env?.EMAIL_USER}>`,
       to: params.to,
       subject: `[Syiar QRIS Run] ✅ Pembayaran Dikonfirmasi — E-Tiket ${params.eventTitle} Siap!`,
       html: wrapEmailTemplate('E-Tiket Siap', bodyHtml),
