@@ -204,6 +204,30 @@ if (Astro.request.method === "POST") {
       } else {
         errorMsg = "Gagal memperbarui data pendaftar.";
       }
+    } else if (action === "resend_email" && idStr) {
+      const id = parseInt(idStr.toString(), 10);
+      const { getRegistrationWithEventById } = await import("../../../lib/db");
+      const { sendTicketConfirmedEmail } = await import("../../../lib/email");
+      
+      const regDetail = await getRegistrationWithEventById(id);
+      if (regDetail && regDetail.status === 'PAID') {
+        const sent = await sendTicketConfirmedEmail({
+          to: regDetail.email,
+          name: regDetail.name,
+          eventTitle: regDetail.eventTitle,
+          eventDate: regDetail.eventDate,
+          eventLocation: regDetail.eventLocation,
+          amount: regDetail.amount,
+          regId: regDetail.id,
+        });
+        if (sent) {
+          successMsg = `Email e-tiket berhasil dikirim ulang ke ${regDetail.email}`;
+        } else {
+          errorMsg = `Gagal mengirim email ke ${regDetail.email}. Pastikan SMTP berjalan dengan baik.`;
+        }
+      } else {
+        errorMsg = "Pendaftar tidak ditemukan atau status belum LUNAS.";
+      }
     } else if (action === "import_csv") {
       const file = formData.get("csv_file") as File;
       if (file && file.size > 0) {
@@ -980,6 +1004,7 @@ const allEvents = await getAllEvents();
       actionBtn = `<span style="font-size:0.85rem; color:#ef4444; font-style:italic; margin-right:0.5rem;">Kadaluarsa</span><button type="button" class="btn-table btn-edit open-edit-modal-btn" data-id="${reg.id}" data-email="${reg.email}" data-phone="${reg.phone}" data-status="${reg.status}" style="background: rgba(45,130,255,0.15); color: #3b82f6; border: 1px solid rgba(45,130,255,0.4);">✏️ Edit</button>`;
     } else {
       actionBtn = `<a href="/ticket/${reg.id}" class="btn-table btn-edit" target="_blank">Lihat Tiket</a>`;
+      actionBtn += `<form method="POST" onsubmit="return confirm('Kirim ulang email E-Tiket untuk pendaftar ini?');" style="margin:0; display:inline-block; margin-left:0.5rem;"><input type="hidden" name="action" value="resend_email"><input type="hidden" name="id" value="${reg.id}"><button type="submit" class="btn-table btn-edit" style="background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.4);">📧 Kirim Email</button></form>`;
     }
 
     return `<tr
