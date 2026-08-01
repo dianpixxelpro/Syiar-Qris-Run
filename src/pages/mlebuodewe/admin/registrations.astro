@@ -132,9 +132,8 @@ if (Astro.request.method === "POST") {
       const regDetail = await getRegistrationWithEventById(id);
       const success = await updateRegistrationStatus(id, "PAID");
       if (success) {
-        successMsg = "Pembayaran berhasil dikonfirmasi secara manual!";
         if (regDetail) {
-          await sendTicketConfirmedEmail({
+          const sent = await sendTicketConfirmedEmail({
             to: regDetail.email,
             name: regDetail.name,
             eventTitle: regDetail.eventTitle,
@@ -143,6 +142,13 @@ if (Astro.request.method === "POST") {
             amount: regDetail.amount,
             regId: regDetail.id,
           });
+          if (sent) {
+            successMsg = "Pembayaran berhasil dikonfirmasi dan Email E-Tiket terkirim!";
+          } else {
+            errorMsg = "Pembayaran dikonfirmasi di database, TETAPI Email gagal dikirim! (Cek terminal server).";
+          }
+        } else {
+          successMsg = "Pembayaran dikonfirmasi, tapi data pendaftar tidak lengkap untuk email.";
         }
       } else {
         errorMsg = "Gagal mengonfirmasi pembayaran.";
