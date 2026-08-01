@@ -27,9 +27,7 @@ async function run() {
   const { data: registrations, error } = await supabase
     .from('registrations')
     .select('*')
-    .gte('id', 1151)
-    .lte('id', 1398)
-    .eq('status', 'PAID')
+    .in('id', [1113, 1120, 1136])
     .order('id', { ascending: true });
     
   if (error) {

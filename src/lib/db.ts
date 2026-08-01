@@ -224,30 +224,44 @@ export async function getRegistrationById(id: number): Promise<Registration | un
 }
 
 export async function getAllRegistrations(): Promise<(Registration & { eventTitle: string })[]> {
-  // Auto-cleanup dinonaktifkan agar data EXPIRED tetap muncul di admin
+  // Fetch semua data dari database karena Supabase memiliki batas 1000 row per query
+  let allData: any[] = [];
+  let from = 0;
+  const limit = 1000;
+  let hasMore = true;
 
-  const { data, error } = await supabase
-    .from('registrations')
-    .select(`
-      *,
-      events (
-        title
-      )
-    `)
-    .order('created_at', { ascending: false })
-    .limit(1000);
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from('registrations')
+      .select(`
+        id, event_id, name, email, phone, status, amount, payment_method, checked_in, transaction_id, transaction_time, created_at,
+        events ( title )
+      `)
+      .order('id', { ascending: false })
+      .range(from, from + limit - 1);
 
-  if (error) {
-    console.error('Error fetching all registrations:', error);
-    return [];
+    if (error) {
+      console.error('Error fetching all registrations:', error);
+      break;
+    }
+
+    if (data && data.length > 0) {
+      allData = allData.concat(data);
+      from += limit;
+      if (data.length < limit) {
+        hasMore = false;
+      }
+    } else {
+      hasMore = false;
+    }
   }
 
-  return (data || []).reduce((acc: any[], dbReg: any) => {
+  return allData.reduce((acc: any[], dbReg: any) => {
     const reg = mapRegistration(dbReg);
     
     // Dynamic Expiration Check
     const limitTime = new Date(reg.createdAt).getTime() + (30 * 60 * 1000); // 30 menit
-    if (reg.status === 'PENDING' && !reg.paymentProof && Date.now() > limitTime) {
+    if (reg.status === 'PENDING' && !reg.paymentProof && !reg.transactionId && !reg.transactionTime && Date.now() > limitTime) {
       reg.status = 'EXPIRED';
     }
 

@@ -153,44 +153,53 @@ if (Astro.request.method === "POST") {
       const phone = formData.get("phone")?.toString() || "";
       const status = formData.get("status")?.toString() || "";
       const receiptFile = formData.get("receipt") as File | null;
-      
-      const { updateRegistration, updateRegistrationStatus, uploadPaymentProof, getRegistrationWithEventById } = await import("../../../lib/db");
-      
+
+      const {
+        updateRegistration,
+        updateRegistrationStatus,
+        uploadPaymentProof,
+        getRegistrationWithEventById,
+      } = await import("../../../lib/db");
+
       let editSuccess = await updateRegistration(id, { email, phone });
-      
+
       if (editSuccess) {
         const regDetail = await getRegistrationWithEventById(id);
-        
+
         if (status && regDetail && regDetail.status !== status) {
-           const updateStatusSuccess = await updateRegistrationStatus(id, status as any);
-           if (updateStatusSuccess && status === "PAID") {
-             const updatedReg = await getRegistrationWithEventById(id);
-             if (updatedReg) {
-               await sendTicketConfirmedEmail({
-                 to: email || updatedReg.email,
-                 name: updatedReg.name,
-                 eventTitle: updatedReg.eventTitle,
-                 eventDate: updatedReg.eventDate,
-                 eventLocation: updatedReg.eventLocation,
-                 amount: updatedReg.amount,
-                 regId: updatedReg.id,
-               });
-             }
-           }
+          const updateStatusSuccess = await updateRegistrationStatus(
+            id,
+            status as any,
+          );
+          if (updateStatusSuccess && status === "PAID") {
+            const updatedReg = await getRegistrationWithEventById(id);
+            if (updatedReg) {
+              await sendTicketConfirmedEmail({
+                to: email || updatedReg.email,
+                name: updatedReg.name,
+                eventTitle: updatedReg.eventTitle,
+                eventDate: updatedReg.eventDate,
+                eventLocation: updatedReg.eventLocation,
+                amount: updatedReg.amount,
+                regId: updatedReg.id,
+              });
+            }
+          }
         }
-        
+
         if (receiptFile && receiptFile.size > 0) {
-           if (receiptFile.size <= 2 * 1024 * 1024) {
-             const buffer = Buffer.from(await receiptFile.arrayBuffer());
-             const base64Image = `data:${receiptFile.type};base64,${buffer.toString("base64")}`;
-             await uploadPaymentProof(id, base64Image, new Date().toISOString());
-           } else {
-             errorMsg = "Data diupdate, tapi Bukti Transfer gagal diunggah (Ukuran terlalu besar, Maks 2MB).";
-           }
+          if (receiptFile.size <= 2 * 1024 * 1024) {
+            const buffer = Buffer.from(await receiptFile.arrayBuffer());
+            const base64Image = `data:${receiptFile.type};base64,${buffer.toString("base64")}`;
+            await uploadPaymentProof(id, base64Image, new Date().toISOString());
+          } else {
+            errorMsg =
+              "Data diupdate, tapi Bukti Transfer gagal diunggah (Ukuran terlalu besar, Maks 2MB).";
+          }
         }
-        
+
         if (!errorMsg) {
-           successMsg = "Data pendaftar berhasil diperbarui!";
+          successMsg = "Data pendaftar berhasil diperbarui!";
         }
       } else {
         errorMsg = "Gagal memperbarui data pendaftar.";
@@ -367,7 +376,7 @@ const allEvents = await getAllEvents();
                 placeholder="Cari Nama..."
                 style="padding: 0.3rem 0.6rem; font-size: 0.8rem; height: auto; border-radius: 6px; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); color: white;"
               />
-              
+
               <select
                 id="filter-status"
                 class="form-control"
@@ -410,14 +419,24 @@ const allEvents = await getAllEvents();
         </div>
 
         <!-- Loading indicator -->
-        <div id="table-loading" style="text-align: center; padding: 3rem; color: #94a3b8;">
-          <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-top-color: var(--accent, #00e5ff); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 1rem;"></div>
+        <div
+          id="table-loading"
+          style="text-align: center; padding: 3rem; color: #94a3b8;"
+        >
+          <div
+            style="display: inline-block; width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-top-color: var(--accent, #00e5ff); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 1rem;"
+          >
+          </div>
           <p>Memuat data pendaftar...</p>
         </div>
 
         <!-- Table (populated via JS) -->
         <div id="table-wrapper" style="display:none;">
-          <div id="table-info" style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 0.5rem;"></div>
+          <div
+            id="table-info"
+            style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 0.5rem;"
+          >
+          </div>
           <div class="table-scroll">
             <table class="event-table">
               <thead>
@@ -434,23 +453,36 @@ const allEvents = await getAllEvents();
                   <th class="actions-col">Aksi</th>
                 </tr>
               </thead>
-              <tbody id="registrations-tbody">
-              </tbody>
+              <tbody id="registrations-tbody"> </tbody>
             </table>
           </div>
-          <div id="pagination-controls" style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 1.5rem; flex-wrap: wrap;"></div>
+          <div
+            id="pagination-controls"
+            style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 1.5rem; flex-wrap: wrap;"
+          >
+          </div>
         </div>
 
         <div id="table-empty" class="empty-table" style="display:none;">
           <p>Belum ada data pendaftar masuk.</p>
         </div>
 
-        <div id="table-error" style="display:none; text-align:center; padding: 2rem; color: #ef4444;">
+        <div
+          id="table-error"
+          style="display:none; text-align:center; padding: 2rem; color: #ef4444;"
+        >
           <p id="table-error-msg">Terjadi kesalahan saat memuat data.</p>
         </div>
 
         <style>
-          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+          @keyframes spin {
+            0% {
+              transform: rotate(0deg);
+            }
+            100% {
+              transform: rotate(360deg);
+            }
+          }
         </style>
       </div>
 
@@ -764,43 +796,102 @@ const allEvents = await getAllEvents();
 
       <!-- Modal Edit Pendaftar -->
       <div id="editRegModal" class="modal-overlay">
-        <div class="modal-content glass" style="max-width: 600px; padding: 2rem;">
-          <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+        <div
+          class="modal-content glass"
+          style="max-width: 600px; padding: 2rem;"
+        >
+          <div
+            class="modal-header"
+            style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem; margin-bottom: 1.5rem;"
+          >
             <h3 style="margin: 0; font-size: 1.5rem;">✏️ Edit Pendaftar</h3>
-            <button class="close-modal" id="closeEditRegModal" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            <button
+              class="close-modal"
+              id="closeEditRegModal"
+              style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;"
+              >&times;</button
+            >
           </div>
           <form method="POST" enctype="multipart/form-data">
             <input type="hidden" name="action" value="edit_reg" />
             <input type="hidden" name="id" id="editRegId" />
-            
+
             <div class="form-group mb-3" style="margin-bottom: 1.2rem;">
-              <label style="display:block; margin-bottom:0.5rem;">Email Pemesan</label>
-              <input type="email" name="email" id="editRegEmail" class="form-control" required style="width:100%; padding:0.6rem; background:#1e293b; color:white; border:1px solid #334155; border-radius:4px;" />
+              <label style="display:block; margin-bottom:0.5rem;"
+                >Email Pemesan</label
+              >
+              <input
+                type="email"
+                name="email"
+                id="editRegEmail"
+                class="form-control"
+                required
+                style="width:100%; padding:0.6rem; background:#1e293b; color:white; border:1px solid #334155; border-radius:4px;"
+              />
             </div>
-            
+
             <div class="form-group mb-3" style="margin-bottom: 1.2rem;">
-              <label style="display:block; margin-bottom:0.5rem;">No. WhatsApp</label>
-              <input type="text" name="phone" id="editRegPhone" class="form-control" required style="width:100%; padding:0.6rem; background:#1e293b; color:white; border:1px solid #334155; border-radius:4px;" />
+              <label style="display:block; margin-bottom:0.5rem;"
+                >No. WhatsApp</label
+              >
+              <input
+                type="text"
+                name="phone"
+                id="editRegPhone"
+                class="form-control"
+                required
+                style="width:100%; padding:0.6rem; background:#1e293b; color:white; border:1px solid #334155; border-radius:4px;"
+              />
             </div>
-            
+
             <div class="form-group mb-3" style="margin-bottom: 1.2rem;">
-              <label style="display:block; margin-bottom:0.5rem;">Status Pendaftaran</label>
-              <select name="status" id="editRegStatus" class="form-control" required style="width:100%; padding:0.6rem; background:#1e293b; color:white; border:1px solid #334155; border-radius:4px;">
+              <label style="display:block; margin-bottom:0.5rem;"
+                >Status Pendaftaran</label
+              >
+              <select
+                name="status"
+                id="editRegStatus"
+                class="form-control"
+                required
+                style="width:100%; padding:0.6rem; background:#1e293b; color:white; border:1px solid #334155; border-radius:4px;"
+              >
                 <option value="PENDING">PENDING (Menunggu Pembayaran)</option>
                 <option value="PAID">PAID (Lunas)</option>
                 <option value="EXPIRED">EXPIRED (Kadaluarsa)</option>
               </select>
             </div>
-            
+
             <div class="form-group mb-3" style="margin-bottom: 1.5rem;">
-              <label style="display:block; margin-bottom:0.5rem;">Upload/Timpa Bukti Transfer (Opsional)</label>
-              <input type="file" name="receipt" accept="image/*" class="form-control" style="width:100%; padding:0.5rem; background:#1e293b; color:white; border:1px solid #334155; border-radius:4px;" />
-              <small style="color: #94a3b8; display: block; margin-top: 0.25rem;">Kosongkan jika tidak ingin mengubah bukti transfer.</small>
+              <label style="display:block; margin-bottom:0.5rem;"
+                >Upload/Timpa Bukti Transfer (Opsional)</label
+              >
+              <input
+                type="file"
+                name="receipt"
+                accept="image/*"
+                class="form-control"
+                style="width:100%; padding:0.5rem; background:#1e293b; color:white; border:1px solid #334155; border-radius:4px;"
+              />
+              <small
+                style="color: #94a3b8; display: block; margin-top: 0.25rem;"
+                >Kosongkan jika tidak ingin mengubah bukti transfer.</small
+              >
             </div>
-            
-            <div style="display:flex; justify-content:flex-end; gap:1rem; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 1.5rem;">
-              <button type="button" class="btn btn-outline" id="cancelEditReg" style="padding: 0.6rem 1.5rem;">Batal</button>
-              <button type="submit" class="btn btn-primary" style="padding: 0.6rem 1.5rem;">Simpan Perubahan</button>
+
+            <div
+              style="display:flex; justify-content:flex-end; gap:1rem; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 1.5rem;"
+            >
+              <button
+                type="button"
+                class="btn btn-outline"
+                id="cancelEditReg"
+                style="padding: 0.6rem 1.5rem;">Batal</button
+              >
+              <button
+                type="submit"
+                class="btn btn-primary"
+                style="padding: 0.6rem 1.5rem;">Simpan Perubahan</button
+              >
             </div>
           </form>
         </div>
@@ -811,10 +902,16 @@ const allEvents = await getAllEvents();
 
 <script>
   // ===== DATA LOADING VIA API =====
-  const filterDateStart = document.getElementById("filter-date-start") as HTMLInputElement;
-  const filterDateEnd = document.getElementById("filter-date-end") as HTMLInputElement;
+  const filterDateStart = document.getElementById(
+    "filter-date-start",
+  ) as HTMLInputElement;
+  const filterDateEnd = document.getElementById(
+    "filter-date-end",
+  ) as HTMLInputElement;
   const filterName = document.getElementById("filter-name") as HTMLInputElement;
-  const filterStatus = document.getElementById("filter-status") as HTMLSelectElement;
+  const filterStatus = document.getElementById(
+    "filter-status",
+  ) as HTMLSelectElement;
   const resetFilterBtn = document.getElementById("btn-reset-filter");
   const paginationControls = document.getElementById("pagination-controls");
   const tableLoading = document.getElementById("table-loading");
@@ -835,11 +932,19 @@ const allEvents = await getAllEvents();
 
   function formatPrice(price: number) {
     if (price === 0) return "Gratis";
-    return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(price);
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
+    }).format(price);
   }
 
   function formatDate(dateStr: string) {
-    return new Date(dateStr).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+    return new Date(dateStr).toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
   }
 
   function parseName(nameStr: string) {
@@ -847,7 +952,10 @@ const allEvents = await getAllEvents();
       const arr = JSON.parse(nameStr);
       if (Array.isArray(arr) && arr.length > 0) {
         if (arr.length === 1) return arr[0].name;
-        return arr.map((p: any) => p.name).join(", ") + ` (Kolektif: ${arr.length} orang)`;
+        return (
+          arr.map((p: any) => p.name).join(", ") +
+          ` (Kolektif: ${arr.length} orang)`
+        );
       }
     } catch (e) {}
     return nameStr;
@@ -876,14 +984,14 @@ const allEvents = await getAllEvents();
 
     return `<tr
       data-id="${reg.id}"
-      data-raw-name="${reg.name.replace(/"/g, '&quot;')}"
+      data-raw-name="${reg.name.replace(/"/g, "&quot;")}"
       data-email="${reg.email}"
       data-phone="${reg.phone}"
       data-amount="${reg.amount}"
       data-status="${reg.status}"
       data-checkin="${checkinText}"
       data-date="${formatDate(reg.createdAt)}"
-      data-has-proof="${reg.paymentProof ? 'Ada' : 'Tidak'}"
+      data-has-proof="${reg.paymentProof ? "Ada" : "Tidak"}"
     >
       <td class="reg-id-cell"><strong>#REG-${reg.id}</strong></td>
       <td><div class="event-name-cell"><strong>${parseName(reg.name)}</strong><span class="event-id">${reg.email}</span></div></td>
@@ -903,13 +1011,15 @@ const allEvents = await getAllEvents();
       btn.addEventListener("click", async () => {
         const proofUrl = btn.getAttribute("data-proof");
         const modal = document.getElementById("receipt-modal");
-        const modalImg = document.getElementById("modal-img") as HTMLImageElement;
-        
-        if (proofUrl && modal && modalImg) { 
+        const modalImg = document.getElementById(
+          "modal-img",
+        ) as HTMLImageElement;
+
+        if (proofUrl && modal && modalImg) {
           modal.classList.add("active");
           modalImg.src = ""; // Clear old image
           modalImg.alt = "Memuat bukti...";
-          
+
           try {
             const res = await fetch(proofUrl);
             if (!res.ok) throw new Error("Gagal memuat bukti");
@@ -930,13 +1040,23 @@ const allEvents = await getAllEvents();
         const phone = btn.getAttribute("data-phone");
         const status = btn.getAttribute("data-status");
         const editModal = document.getElementById("editRegModal");
-        const editId = document.getElementById("edit-reg-id") as HTMLInputElement;
-        const editEmail = document.getElementById("edit-reg-email") as HTMLInputElement;
-        const editPhone = document.getElementById("edit-reg-phone") as HTMLInputElement;
-        const editStatus = document.getElementById("edit-reg-status") as HTMLSelectElement;
+        const editId = document.getElementById(
+          "edit-reg-id",
+        ) as HTMLInputElement;
+        const editEmail = document.getElementById(
+          "edit-reg-email",
+        ) as HTMLInputElement;
+        const editPhone = document.getElementById(
+          "edit-reg-phone",
+        ) as HTMLInputElement;
+        const editStatus = document.getElementById(
+          "edit-reg-status",
+        ) as HTMLSelectElement;
         if (editModal && editId && editEmail && editPhone && editStatus) {
-          editId.value = id || ""; editEmail.value = email || "";
-          editPhone.value = phone || ""; editStatus.value = status || "";
+          editId.value = id || "";
+          editEmail.value = email || "";
+          editPhone.value = phone || "";
+          editStatus.value = status || "";
           editModal.classList.add("active");
         }
       });
@@ -949,11 +1069,13 @@ const allEvents = await getAllEvents();
     if (pages <= 1) return;
 
     const container = document.createElement("div");
-    container.style.cssText = "display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; justify-content:center;";
+    container.style.cssText =
+      "display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; justify-content:center;";
 
     // Info text
     const info = document.createElement("span");
-    info.style.cssText = "color:#94a3b8; font-size:0.85rem; margin-right:0.5rem;";
+    info.style.cssText =
+      "color:#94a3b8; font-size:0.85rem; margin-right:0.5rem;";
     info.textContent = `Halaman ${current} dari ${pages} (Total: ${total} data)`;
     container.appendChild(info);
 
@@ -963,7 +1085,9 @@ const allEvents = await getAllEvents();
     prevBtn.className = "btn btn-sm btn-outline";
     prevBtn.style.cssText = "padding:0.3rem 0.8rem; font-size:0.85rem;";
     prevBtn.disabled = current <= 1;
-    prevBtn.addEventListener("click", () => { goToPage(current - 1); });
+    prevBtn.addEventListener("click", () => {
+      goToPage(current - 1);
+    });
     container.appendChild(prevBtn);
 
     // Page buttons (show up to 7 around current page)
@@ -1015,7 +1139,9 @@ const allEvents = await getAllEvents();
     nextBtn.className = "btn btn-sm btn-outline";
     nextBtn.style.cssText = "padding:0.3rem 0.8rem; font-size:0.85rem;";
     nextBtn.disabled = current >= pages;
-    nextBtn.addEventListener("click", () => { goToPage(current + 1); });
+    nextBtn.addEventListener("click", () => {
+      goToPage(current + 1);
+    });
     container.appendChild(nextBtn);
 
     paginationControls.appendChild(container);
@@ -1037,11 +1163,17 @@ const allEvents = await getAllEvents();
     const end = start + PAGE_SIZE;
     const pageRows = matchedRows.slice(start, end);
     tbody.innerHTML = pageRows.map(buildRow).join("");
-    if (tableInfo) tableInfo.textContent = `Halaman ${currentPage} — Menampilkan ${start + 1}–${Math.min(end, matchedRows.length)} dari ${matchedRows.length} hasil filter`;
-    renderPagination(matchedRows.length, currentPage, Math.ceil(matchedRows.length / PAGE_SIZE));
+    if (tableInfo)
+      tableInfo.textContent = `Halaman ${currentPage} — Menampilkan ${start + 1}–${Math.min(end, matchedRows.length)} dari ${matchedRows.length} hasil filter`;
+    renderPagination(
+      matchedRows.length,
+      currentPage,
+      Math.ceil(matchedRows.length / PAGE_SIZE),
+    );
     attachRowListeners();
     if (tableWrapper) tableWrapper.style.display = "block";
-    if (tableEmpty) tableEmpty.style.display = matchedRows.length === 0 ? "block" : "none";
+    if (tableEmpty)
+      tableEmpty.style.display = matchedRows.length === 0 ? "block" : "none";
   }
 
   async function loadPage(page: number) {
@@ -1050,7 +1182,9 @@ const allEvents = await getAllEvents();
     if (tableError) tableError.style.display = "none";
 
     try {
-      const res = await fetch(`/mlebuodewe/admin/api/registrations?page=${page}&pageSize=${PAGE_SIZE}`);
+      const res = await fetch(
+        `/mlebuodewe/admin/api/registrations?page=${page}&pageSize=${PAGE_SIZE}`,
+      );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -1061,7 +1195,8 @@ const allEvents = await getAllEvents();
 
       if (!tbody) return;
       tbody.innerHTML = allData.map(buildRow).join("");
-      if (tableInfo) tableInfo.textContent = `Halaman ${page} — Menampilkan ${(page-1)*PAGE_SIZE+1}–${Math.min(page*PAGE_SIZE, totalRecords)} dari ${totalRecords} total pendaftar`;
+      if (tableInfo)
+        tableInfo.textContent = `Halaman ${page} — Menampilkan ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, totalRecords)} dari ${totalRecords} total pendaftar`;
       renderPagination(totalRecords, page, totalPages);
       attachRowListeners();
 
@@ -1076,7 +1211,8 @@ const allEvents = await getAllEvents();
     } catch (err: any) {
       if (tableLoading) tableLoading.style.display = "none";
       if (tableError) tableError.style.display = "block";
-      if (tableErrorMsg) tableErrorMsg.textContent = `Gagal memuat data: ${err.message}`;
+      if (tableErrorMsg)
+        tableErrorMsg.textContent = `Gagal memuat data: ${err.message}`;
     }
   }
 
@@ -1097,8 +1233,10 @@ const allEvents = await getAllEvents();
     }
 
     isFiltering = true;
-    const startDate = startStr ? new Date(startStr).setHours(0,0,0,0) : 0;
-    const endDate = endStr ? new Date(endStr).setHours(23,59,59,999) : Infinity;
+    const startDate = startStr ? new Date(startStr).setHours(0, 0, 0, 0) : 0;
+    const endDate = endStr
+      ? new Date(endStr).setHours(23, 59, 59, 999)
+      : Infinity;
 
     matchedRows = allData.filter((reg) => {
       const rowDate = new Date(reg.createdAt).getTime();
@@ -1118,7 +1256,13 @@ const allEvents = await getAllEvents();
   loadPage(1);
 
   // Filter listeners
-  if (filterDateStart && filterDateEnd && filterName && filterStatus && resetFilterBtn) {
+  if (
+    filterDateStart &&
+    filterDateEnd &&
+    filterName &&
+    filterStatus &&
+    resetFilterBtn
+  ) {
     filterDateStart.addEventListener("change", applyFilter);
     filterDateEnd.addEventListener("change", applyFilter);
     filterName.addEventListener("keyup", applyFilter);
@@ -1136,17 +1280,21 @@ const allEvents = await getAllEvents();
     });
   }
 
-
-
   // Edit Registration Modal Logic
   const editRegModal = document.getElementById("editRegModal");
   const closeEditRegModal = document.getElementById("closeEditRegModal");
   const cancelEditReg = document.getElementById("cancelEditReg");
-  
+
   const editRegId = document.getElementById("editRegId") as HTMLInputElement;
-  const editRegEmail = document.getElementById("editRegEmail") as HTMLInputElement;
-  const editRegPhone = document.getElementById("editRegPhone") as HTMLInputElement;
-  const editRegStatus = document.getElementById("editRegStatus") as HTMLSelectElement;
+  const editRegEmail = document.getElementById(
+    "editRegEmail",
+  ) as HTMLInputElement;
+  const editRegPhone = document.getElementById(
+    "editRegPhone",
+  ) as HTMLInputElement;
+  const editRegStatus = document.getElementById(
+    "editRegStatus",
+  ) as HTMLSelectElement;
 
   document.querySelectorAll(".open-edit-modal-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -1154,7 +1302,7 @@ const allEvents = await getAllEvents();
       editRegId.value = target.getAttribute("data-id") || "";
       editRegEmail.value = target.getAttribute("data-email") || "";
       editRegPhone.value = target.getAttribute("data-phone") || "";
-      
+
       const status = target.getAttribute("data-status") || "PENDING";
       for (let i = 0; i < editRegStatus.options.length; i++) {
         if (editRegStatus.options[i].value === status) {
@@ -1162,7 +1310,7 @@ const allEvents = await getAllEvents();
           break;
         }
       }
-      
+
       if (editRegModal) editRegModal.classList.add("active");
     });
   });
@@ -1171,7 +1319,8 @@ const allEvents = await getAllEvents();
     if (editRegModal) editRegModal.classList.remove("active");
   };
 
-  if (closeEditRegModal) closeEditRegModal.addEventListener("click", hideEditModal);
+  if (closeEditRegModal)
+    closeEditRegModal.addEventListener("click", hideEditModal);
   if (cancelEditReg) cancelEditReg.addEventListener("click", hideEditModal);
 
   const exportBtn = document.getElementById("btn-export-csv");
@@ -1179,13 +1328,24 @@ const allEvents = await getAllEvents();
     exportBtn.addEventListener("click", () => {
       const csvData: string[] = [];
       const headers = [
-        "Reg ID", "Nama Peserta", "Email Pemesan", "No WA Pemesan",
-        "Jenis Kelamin", "Jenis ID", "Nomor ID", "Ukuran Jersey",
-        "Total Bayar (Satu Order)", "Status", "Check-In", "Tanggal Daftar", "Bukti Upload",
+        "Reg ID",
+        "Nama Peserta",
+        "Email Pemesan",
+        "No WA Pemesan",
+        "Jenis Kelamin",
+        "Jenis ID",
+        "Nomor ID",
+        "Ukuran Jersey",
+        "Total Bayar (Satu Order)",
+        "Status",
+        "Check-In",
+        "Tanggal Daftar",
+        "Bukti Upload",
       ];
       csvData.push(headers.join(","));
-      const escapeCsv = (str: any) => `"${String(str || "-").replace(/"/g, '""')}"`;
-      
+      const escapeCsv = (str: any) =>
+        `"${String(str || "-").replace(/"/g, '""')}"`;
+
       matchedRows.forEach((reg: any) => {
         const id = `#REG-${reg.id}`;
         const name = reg.name;
@@ -1200,29 +1360,61 @@ const allEvents = await getAllEvents();
           const arr = JSON.parse(name);
           if (Array.isArray(arr) && arr.length > 0) {
             arr.forEach((p: any) => {
-              csvData.push([escapeCsv(id), escapeCsv(p.name), escapeCsv(email), escapeCsv(phone),
-                escapeCsv(p.jenisKelamin), escapeCsv(p.jenisId), escapeCsv(p.nomorId), escapeCsv(p.ukuranJersey),
-                escapeCsv(amount), escapeCsv(status), escapeCsv(checkin), escapeCsv(date), escapeCsv(proof)].join(","));
+              csvData.push(
+                [
+                  escapeCsv(id),
+                  escapeCsv(p.name),
+                  escapeCsv(email),
+                  escapeCsv(phone),
+                  escapeCsv(p.jenisKelamin),
+                  escapeCsv(p.jenisId),
+                  escapeCsv(p.nomorId),
+                  escapeCsv(p.ukuranJersey),
+                  escapeCsv(amount),
+                  escapeCsv(status),
+                  escapeCsv(checkin),
+                  escapeCsv(date),
+                  escapeCsv(proof),
+                ].join(","),
+              );
             });
             return;
           }
         } catch (e) {}
-        csvData.push([escapeCsv(id), escapeCsv(name), escapeCsv(email), escapeCsv(phone),
-          escapeCsv("-"), escapeCsv("-"), escapeCsv("-"), escapeCsv("-"),
-          escapeCsv(amount), escapeCsv(status), escapeCsv(checkin), escapeCsv(date), escapeCsv(proof)].join(","));
+        csvData.push(
+          [
+            escapeCsv(id),
+            escapeCsv(name),
+            escapeCsv(email),
+            escapeCsv(phone),
+            escapeCsv("-"),
+            escapeCsv("-"),
+            escapeCsv("-"),
+            escapeCsv("-"),
+            escapeCsv(amount),
+            escapeCsv(status),
+            escapeCsv(checkin),
+            escapeCsv(date),
+            escapeCsv(proof),
+          ].join(","),
+        );
       });
 
-      const blob = new Blob([csvData.join("\n")], { type: "text/csv;charset=utf-8;" });
+      const blob = new Blob([csvData.join("\n")], {
+        type: "text/csv;charset=utf-8;",
+      });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `data_pendaftar_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`);
+      link.setAttribute(
+        "download",
+        `data_pendaftar_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`,
+      );
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     });
   }
-
 
   // Tambah Manual Logic
   const addManualBtn = document.getElementById("btn-add-manual");

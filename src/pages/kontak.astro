@@ -13,7 +13,8 @@ import Layout from "../layouts/Layout.astro";
         <!-- <span class="badge-blue">SUPPORT CENTER</span> -->
         <h1 class="page-title">
           Ada Pertanyaan? <br class="mobile-hidden" /><span
-            class="text-accent italic">Kami Siap Membantu.</span>
+            class="text-accent italic">Kami Siap Membantu.</span
+          >
         </h1>
         <p class="page-subtitle">
           Tim kami berdedikasi untuk memberikan pengalaman lari terbaik bagi
@@ -32,7 +33,8 @@ import Layout from "../layouts/Layout.astro";
             <div class="contact-info">
               <span class="contact-label">LOKASI</span>
               <p class="contact-value">
-                Kediri Town Square, Jl. Hasanudin No.2, Balowerti, Gampengrejo, Kediri, Jawa Timur
+                Kediri Town Square, Jl. Hasanudin No.2, Balowerti, Gampengrejo,
+                Kediri, Jawa Timur
               </p>
             </div>
           </div>
@@ -41,9 +43,68 @@ import Layout from "../layouts/Layout.astro";
             <div class="contact-icon-wrapper">
               <span class="contact-icon">💬</span>
             </div>
-            <div class="contact-info">
-              <span class="contact-label">WHATSAPP</span>
-              <p class="contact-value">+62 815-5257-733</p>
+            <div class="contact-info" style="width: 100%;">
+              <span class="contact-label">WHATSAPP ADMIN</span>
+              <div
+                style="display: flex; flex-direction: column; gap: 0.8rem; margin-top: 0.5rem; width: 100%;"
+              >
+                <div
+                  style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(0,0,0,0.1); padding-bottom: 0.5rem; gap: 2rem; flex-wrap: wrap;"
+                >
+                  <p class="contact-value" style="font-size: 1.05rem;">
+                    Admin 1 (Dewi)
+                  </p>
+                  <a
+                    href="https://wa.me/628155257733"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style="color: #25d366; text-decoration: none; font-weight: 700;"
+                    >+62 815-5257-733</a
+                  >
+                </div>
+                <div
+                  style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(0,0,0,0.1); padding-bottom: 0.5rem; gap: 2rem; flex-wrap: wrap;"
+                >
+                  <p class="contact-value" style="font-size: 1.05rem;">
+                    Admin 2 (Sisil)
+                  </p>
+                  <a
+                    href="https://wa.me/6285196689604"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style="color: #25d366; text-decoration: none; font-weight: 700;"
+                    >+62 851-9668-9604</a
+                  >
+                </div>
+                <div
+                  style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(0,0,0,0.1); padding-bottom: 0.5rem; gap: 2rem; flex-wrap: wrap;"
+                >
+                  <p class="contact-value" style="font-size: 1.05rem;">
+                    Admin 3 (Rere)
+                  </p>
+                  <a
+                    href="https://wa.me/628132942336"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style="color: #25d366; text-decoration: none; font-weight: 700;"
+                    >+62 813-2942-336</a
+                  >
+                </div>
+                <div
+                  style="display: flex; justify-content: space-between; align-items: center; gap: 2rem; flex-wrap: wrap;"
+                >
+                  <p class="contact-value" style="font-size: 1.05rem;">
+                    Admin 4 (Firman)
+                  </p>
+                  <a
+                    href="https://wa.me/6285877049274"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style="color: #25d366; text-decoration: none; font-weight: 700;"
+                    >+62 858-7704-9274</a
+                  >
+                </div>
+              </div>
             </div>
           </div>
 
@@ -88,11 +149,11 @@ import Layout from "../layouts/Layout.astro";
           allowfullscreen=""
           loading="lazy"
           referrerpolicy="no-referrer-when-downgrade"
-          class="map-iframe"
-        ></iframe>
+          class="map-iframe"></iframe>
         <div class="map-center-label" role="note">
           <span class="pin">📍</span>
-          <span class="map-label-text">Kediri Town Square — Start & Finish</span>
+          <span class="map-label-text">Kediri Town Square — Start & Finish</span
+          >
         </div>
       </div>
     </div>
@@ -320,7 +381,7 @@ import Layout from "../layouts/Layout.astro";
     right: 12px;
     bottom: 12px;
     transform: none;
-    background: rgba(2,6,23,0.75);
+    background: rgba(2, 6, 23, 0.75);
     color: #fff;
     padding: 0.45rem 0.75rem;
     border-radius: 10px;
@@ -328,11 +389,13 @@ import Layout from "../layouts/Layout.astro";
     gap: 0.5rem;
     align-items: center;
     font-weight: 700;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
     pointer-events: none;
   }
 
-  .map-center-label .pin { font-size: 1.05rem; }
+  .map-center-label .pin {
+    font-size: 1.05rem;
+  }
 
   @media (max-width: 768px) {
     .page-title {
@@ -352,6 +415,11 @@ import Layout from "../layouts/Layout.astro";
     .map-container {
       height: 300px;
     }
-    .map-center-label { padding: 0.35rem 0.6rem; font-size: 0.95rem; right: 10px; bottom: 10px; }
+    .map-center-label {
+      padding: 0.35rem 0.6rem;
+      font-size: 0.95rem;
+      right: 10px;
+      bottom: 10px;
+    }
   }
 </style>
