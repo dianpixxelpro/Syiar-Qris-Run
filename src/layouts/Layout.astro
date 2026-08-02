@@ -6,12 +6,12 @@ interface Props {
   title: string;
   description?: string;
   image?: string;
-  schemaType?: 'Event' | 'WebSite' | 'Article' | 'Organization';
+  schemaType?: "Event" | "WebSite" | "Article" | "Organization";
   noindex?: boolean;
 }
 
 // Cek apakah pendaftaran sudah dibuka (31 Juli 2026, 08:00 WIB)
-const registrationOpenDate = new Date('2026-07-31T08:00:00+07:00');
+const registrationOpenDate = new Date("2026-07-31T08:00:00+07:00");
 const isRegistrationOpen = new Date() >= registrationOpenDate;
 
 const {
@@ -77,12 +77,27 @@ const {
         </nav>
 
         <div class="header-actions">
-          <a href="/cek-status" class="nav-link btn-buy-ticket desktop-only" style="margin-right: 0.5rem; background: transparent; border: 1px solid var(--accent); color: white !important;">Cek Status</a>
-          {isRegistrationOpen ? (
-            <a href="/events/1" class="nav-link btn-buy-ticket desktop-only">Daftar Sekarang</a>
-          ) : (
-            <button class="nav-link btn-buy-ticket desktop-only" style="background-color: #6b7280; color: white; cursor: not-allowed; opacity: 0.8; border: none;" disabled>Dibuka 31 Juli 2026</button>
-          )}
+          <a
+            href="/cek-status"
+            class="nav-link btn-buy-ticket desktop-only"
+            style="margin-right: 0.5rem; background: transparent; border: 1px solid var(--accent); color: white !important;"
+            >Cek Status</a
+          >
+          {
+            isRegistrationOpen ? (
+              <a href="/events/1" class="nav-link btn-buy-ticket desktop-only">
+                Daftar Sekarang
+              </a>
+            ) : (
+              <button
+                class="nav-link btn-buy-ticket desktop-only"
+                style="background-color: #6b7280; color: white; cursor: not-allowed; opacity: 0.8; border: none;"
+                disabled
+              >
+                Dibuka 31 Juli 2026
+              </button>
+            )
+          }
           <button
             class="mobile-menu-btn"
             id="mobile-menu-toggle"
@@ -98,25 +113,76 @@ const {
       <!-- Mobile Nav -->
       <div class="mobile-nav" id="mobile-nav">
         <a href="/" class="mobile-nav-link">Beranda</a>
-        <button class="mobile-nav-link" id="mobile-info-toggle" style="width: 100%; text-align: left; background: none; border: none; border-bottom: 1px solid rgba(255, 255, 255, 0.05); color: inherit; font-family: inherit; cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0;">
-          Informasi <span class="arrow" style="font-size: 0.8em; transition: transform 0.2s;">▾</span>
+        <button
+          class="mobile-nav-link"
+          id="mobile-info-toggle"
+          style="width: 100%; text-align: left; background: none; border: none; border-bottom: 1px solid rgba(255, 255, 255, 0.05); color: inherit; font-family: inherit; cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0;"
+        >
+          Informasi <span
+            class="arrow"
+            style="font-size: 0.8em; transition: transform 0.2s;">▾</span
+          >
         </button>
-        <div class="mobile-dropdown-menu" id="mobile-info-menu" style="display: none; flex-direction: column; padding-left: 1.5rem; background: rgba(0,0,0,0.1); border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
-          <a href="/jersey" class="mobile-nav-link" style="border-bottom: 1px dashed rgba(255,255,255,0.05); font-size: 1rem;">Jersey</a>
-          <a href="/medali" class="mobile-nav-link" style="border-bottom: 1px dashed rgba(255,255,255,0.05); font-size: 1rem;">Medali</a>
-          <a href="/rute" class="mobile-nav-link" style="border-bottom: 1px dashed rgba(255,255,255,0.05); font-size: 1rem;">Rute</a>
-          <a href="/panduan" class="mobile-nav-link" style="border-bottom: none; font-size: 1rem;">Panduan Pendaftaran</a>
+        <div
+          class="mobile-dropdown-menu"
+          id="mobile-info-menu"
+          style="display: none; flex-direction: column; padding-left: 1.5rem; background: rgba(0,0,0,0.1); border-bottom: 1px solid rgba(255, 255, 255, 0.05);"
+        >
+          <a
+            href="/jersey"
+            class="mobile-nav-link"
+            style="border-bottom: 1px dashed rgba(255,255,255,0.05); font-size: 1rem;"
+            >Jersey</a
+          >
+          <a
+            href="/medali"
+            class="mobile-nav-link"
+            style="border-bottom: 1px dashed rgba(255,255,255,0.05); font-size: 1rem;"
+            >Medali</a
+          >
+          <a
+            href="/rute"
+            class="mobile-nav-link"
+            style="border-bottom: 1px dashed rgba(255,255,255,0.05); font-size: 1rem;"
+            >Rute</a
+          >
+          <a
+            href="/panduan"
+            class="mobile-nav-link"
+            style="border-bottom: none; font-size: 1rem;">Panduan Pendaftaran</a
+          >
         </div>
         <a href="/regulasi" class="mobile-nav-link">Regulasi</a>
         <a href="/kontak" class="mobile-nav-link">Kontak</a>
         <!-- <a href="/events/1" class="mobile-nav-link" style="background-color: var(--accent-bright); color: var(--bg-primary) !important; padding: 0.8rem 1rem; border-radius: 12px; text-align: center; margin-top: 1rem; border-bottom: none; font-weight: 800; display: block; white-space: nowrap;">Daftar Sekarang</a> -->
-        <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">
-          {isRegistrationOpen ? (
-            <a href="/events/1" class="mobile-nav-link" style="width: 100%; background-color: var(--accent-bright); color: var(--bg-primary) !important; padding: 0.8rem; border-radius: 12px; text-align: center; font-weight: 800; display: block; white-space: nowrap; margin-top: 0;">Daftar Sekarang</a>
-          ) : (
-            <button class="mobile-nav-link" style="width: 100%; background-color: #6b7280; color: white !important; padding: 0.8rem; border-radius: 12px; text-align: center; font-weight: 800; display: block; white-space: nowrap; cursor: not-allowed; opacity: 0.8; border: none; margin-top: 0;" disabled>Dibuka 31 Juli 2026</button>
-          )}
-          <a href="/cek-status" class="mobile-nav-link" style="width: 100%; background-color: transparent; border: 1px solid var(--accent); color: var(--accent) !important; padding: 0.8rem; border-radius: 12px; text-align: center; font-weight: 800; display: block; white-space: nowrap; margin-top: 0;">Cek Status</a>
+        <div
+          style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;"
+        >
+          {
+            isRegistrationOpen ? (
+              <a
+                href="/events/1"
+                class="mobile-nav-link"
+                style="width: 100%; background-color: var(--accent-bright); color: var(--bg-primary) !important; padding: 0.8rem; border-radius: 12px; text-align: center; font-weight: 800; display: block; white-space: nowrap; margin-top: 0;"
+              >
+                Daftar Sekarang
+              </a>
+            ) : (
+              <button
+                class="mobile-nav-link"
+                style="width: 100%; background-color: #6b7280; color: white !important; padding: 0.8rem; border-radius: 12px; text-align: center; font-weight: 800; display: block; white-space: nowrap; cursor: not-allowed; opacity: 0.8; border: none; margin-top: 0;"
+                disabled
+              >
+                Dibuka 31 Juli 2026
+              </button>
+            )
+          }
+          <a
+            href="/cek-status"
+            class="mobile-nav-link"
+            style="width: 100%; background-color: transparent; border: 1px solid var(--accent); color: var(--accent) !important; padding: 0.8rem; border-radius: 12px; text-align: center; font-weight: 800; display: block; white-space: nowrap; margin-top: 0;"
+            >Cek Status</a
+          >
         </div>
       </div>
     </header>
@@ -139,7 +205,10 @@ const {
             />
           </div>
           <p class="footer-desc">
-            Syiar QRIS Run 2026 merupakan ajang lari yang diselenggarakan oleh Bank Indonesia Kediri untuk mengajak masyarakat menerapkan gaya hidup sehat sekaligus mendukung percepatan digitalisasi sistem pembayaran melalui QRIS.
+            Syiar QRIS Run 2026 merupakan ajang lari yang diselenggarakan oleh
+            Bank Indonesia Kediri untuk mengajak masyarakat menerapkan gaya
+            hidup sehat sekaligus mendukung percepatan digitalisasi sistem
+            pembayaran melalui QRIS.
           </p>
         </div>
         <div class="footer-links">
@@ -159,17 +228,89 @@ const {
         <div class="footer-social">
           <h3>Ikuti Kami</h3>
           <div class="social-icons">
-            <a href="https://youtube.com/@bankindonesiakediri" aria-label="YouTube" target="_blank" rel="noopener noreferrer">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.1c.3-1.5 1.5-2.7 3-3 2.5-.5 6.5-.5 6.5-.5s4 0 6.5.5c1.5.3 2.7 1.5 3 3 .5 2.5.5 4.9.5 4.9s0 2.4-.5 4.9c-.3 1.5-1.5 2.7-3 3-2.5.5-6.5.5-6.5.5s-4 0-6.5-.5c-1.5-.3-2.7-1.5-3-3-.5-2.5-.5-4.9-.5-4.9s0-2.4.5-4.9z"/><path d="m10 15 5-3-5-3v6z"/></svg>
+            <a
+              href="https://youtube.com/@bankindonesiakediri"
+              aria-label="YouTube"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                ><path
+                  d="M2.5 7.1c.3-1.5 1.5-2.7 3-3 2.5-.5 6.5-.5 6.5-.5s4 0 6.5.5c1.5.3 2.7 1.5 3 3 .5 2.5.5 4.9.5 4.9s0 2.4-.5 4.9c-.3 1.5-1.5 2.7-3 3-2.5.5-6.5.5-6.5.5s-4 0-6.5-.5c-1.5-.3-2.7-1.5-3-3-.5-2.5-.5-4.9-.5-4.9s0-2.4.5-4.9z"
+                ></path><path d="m10 15 5-3-5-3v6z"></path></svg
+              >
             </a>
-            <a href="https://x.com/KPwBi_kediri" aria-label="X (Twitter)" target="_blank" rel="noopener noreferrer">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l11.733 16h4.267l-11.733 -16z"/><path d="M4 20l6.768 -6.768m2.46 -2.46l6.772 -6.772"/></svg>
+            <a
+              href="https://x.com/KPwBi_kediri"
+              aria-label="X (Twitter)"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                ><path d="M4 4l11.733 16h4.267l-11.733 -16z"></path><path
+                  d="M4 20l6.768 -6.768m2.46 -2.46l6.772 -6.772"></path></svg
+              >
             </a>
-            <a href="https://instagram.com/bank_indonesia_kediri" aria-label="Instagram" target="_blank" rel="noopener noreferrer">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
+            <a
+              href="https://instagram.com/bank_indonesia_kediri"
+              aria-label="Instagram"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                ><rect width="20" height="20" x="2" y="2" rx="5" ry="5"
+                ></rect><path
+                  d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"
+                ></path><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"
+                ></line></svg
+              >
             </a>
-            <a href="https://tiktok.com/@bank.indonesia.ke" aria-label="TikTok" target="_blank" rel="noopener noreferrer">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/></svg>
+            <a
+              href="https://tiktok.com/@bank.indonesia.ke"
+              aria-label="TikTok"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                ><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path><path
+                  d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path></svg
+              >
             </a>
           </div>
         </div>
@@ -182,15 +323,48 @@ const {
     <!-- Floating WhatsApp Button -->
     <div class="floating-wa-container">
       <div class="floating-wa-menu">
-        <a href="https://wa.me/628155257733" class="wa-item" target="_blank" rel="noopener noreferrer">Admin 1 (Dewi)</a>
-        <a href="https://wa.me/6285196689604" class="wa-item" target="_blank" rel="noopener noreferrer">Admin 2 (Sisil)</a>
-        <a href="https://wa.me/628132942336" class="wa-item" target="_blank" rel="noopener noreferrer">Admin 3 (Rere)</a>
-        <a href="https://wa.me/6285877049274" class="wa-item" target="_blank" rel="noopener noreferrer">Admin 4 (Firman)</a>
-        <a href="https://wa.me/6288991110710" class="wa-item" target="_blank" rel="noopener noreferrer">Admin 5 (Galang)</a>
+        <a
+          href="https://wa.me/628155257733"
+          class="wa-item"
+          target="_blank"
+          rel="noopener noreferrer">Admin 1 (Dewi)</a
+        >
+        <a
+          href="https://wa.me/6285196689604"
+          class="wa-item"
+          target="_blank"
+          rel="noopener noreferrer">Admin 2 (Sisil)</a
+        >
+        <a
+          href="https://wa.me/628132942336"
+          class="wa-item"
+          target="_blank"
+          rel="noopener noreferrer">Admin 3 (Rere)</a
+        >
+        <a
+          href="https://wa.me/6285877049274"
+          class="wa-item"
+          target="_blank"
+          rel="noopener noreferrer">Admin 4 (Firman)</a
+        >
+        <a
+          href="https://wa.me/6288991110710"
+          class="wa-item"
+          target="_blank"
+          rel="noopener noreferrer">Admin 5 (Galang)</a
+        >
       </div>
       <button class="floating-wa" aria-label="Hubungi kami via WhatsApp">
-        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="32"
+          height="32"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+        >
+          <path
+            d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"
+          ></path>
         </svg>
       </button>
     </div>
@@ -236,7 +410,14 @@ const {
     display: flex;
     align-items: center;
     border-bottom: 1px solid var(--border-color);
-    background: linear-gradient(to bottom right, var(--bg-primary) 0%, #201a4e 40%, var(--primary) 100%), rgba(43, 119, 223, 0.5);
+    background:
+      linear-gradient(
+        to bottom right,
+        var(--bg-primary) 0%,
+        #201a4e 40%,
+        var(--primary) 100%
+      ),
+      rgba(43, 119, 223, 0.5);
     background-blend-mode: overlay;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
@@ -281,7 +462,12 @@ const {
     position: absolute;
     top: 100%;
     left: 0;
-    background-color: rgba(43, 119, 223, 0.95); /* Match navbar color but more opaque */
+    background-color: rgba(
+      43,
+      119,
+      223,
+      0.95
+    ); /* Match navbar color but more opaque */
     min-width: 160px;
     box-shadow: var(--shadow-md);
     border-radius: var(--radius-sm);
@@ -440,9 +626,11 @@ const {
     flex-direction: column;
     gap: 1.25rem;
     z-index: 99;
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition:
+      transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      visibility 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow-y: auto;
-    box-shadow: -5px 0 15px rgba(0,0,0,0.3);
+    box-shadow: -5px 0 15px rgba(0, 0, 0, 0.3);
   }
 
   .mobile-nav.active {
@@ -469,7 +657,14 @@ const {
     margin-top: 0;
     position: relative;
     z-index: 10;
-    background: linear-gradient(to bottom right, var(--bg-primary) 0%, #201a4e 40%, var(--primary) 100%), rgba(43, 119, 223, 0.5);
+    background:
+      linear-gradient(
+        to bottom right,
+        var(--bg-primary) 0%,
+        #201a4e 40%,
+        var(--primary) 100%
+      ),
+      rgba(43, 119, 223, 0.5);
     background-blend-mode: overlay;
   }
 
@@ -645,12 +840,12 @@ const {
       bottom: 20px;
       right: 20px;
     }
-    
+
     .floating-wa {
       width: 50px;
       height: 50px;
     }
-    
+
     .floating-wa svg {
       width: 26px;
       height: 26px;
