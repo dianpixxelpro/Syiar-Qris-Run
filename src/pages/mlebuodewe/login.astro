@@ -33,9 +33,15 @@ if (Astro.request.method === "POST") {
   }
 }
 
-// Redirect if already logged in
-if (Astro.cookies.has("admin_session")) {
-  return Astro.redirect("/mlebuodewe/admin");
+// Redirect if already logged in or clear invalid cookie
+const sessionCookie = Astro.cookies.get("admin_session");
+if (sessionCookie) {
+  if (sessionCookie.value === "authenticated") {
+    return Astro.redirect("/mlebuodewe/admin");
+  } else {
+    // Delete invalid cookie to start fresh
+    Astro.cookies.delete("admin_session", { path: "/" });
+  }
 }
 ---
 

@@ -13,6 +13,22 @@ function createTransporter() {
     return null;
   }
 
+  const emailHost = process.env.EMAIL_HOST || (import.meta as any).env?.EMAIL_HOST;
+  const emailPort = process.env.EMAIL_PORT || (import.meta as any).env?.EMAIL_PORT;
+
+  if (emailHost && emailPort) {
+    return nodemailer.createTransport({
+      host: emailHost,
+      port: Number(emailPort),
+      secure: Number(emailPort) === 465, // true for 465, false for other ports like 587
+      auth: {
+        user: emailUser,
+        pass: emailPass,
+      },
+    });
+  }
+
+  // Fallback ke gmail jika EMAIL_HOST dan EMAIL_PORT tidak ada (opsional)
   return nodemailer.createTransport({
     service: 'gmail',
     auth: {
