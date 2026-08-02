@@ -303,11 +303,11 @@ if (Astro.request.method === "POST") {
 
         if (results.confirmedCount > 0) {
           successMsg = `Sistem berhasil memverifikasi ${results.confirmedCount} pembayaran secara otomatis dari mutasi!`;
-          // Mengirim email untuk yang terkonfirmasi otomatis
-          for (const confId of results.confirmedIds) {
+          // Mengirim email untuk yang terkonfirmasi otomatis secara BERSAMAAN (Concurrent)
+          const emailPromises = results.confirmedIds.map(async (confId) => {
             const regDetail = await getRegistrationWithEventById(confId);
             if (regDetail) {
-              await sendTicketConfirmedEmail({
+              return sendTicketConfirmedEmail({
                 to: regDetail.email,
                 name: regDetail.name,
                 eventTitle: regDetail.eventTitle,
@@ -317,7 +317,9 @@ if (Astro.request.method === "POST") {
                 regId: regDetail.id,
               });
             }
-          }
+          });
+          
+          await Promise.all(emailPromises);
         } else {
           errorMsg =
             "Sistem memproses CSV mutasi, namun tidak ada kecocokan nominal unik dengan tiket PENDING yang ditemukan.";
