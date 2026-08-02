@@ -1,11 +1,12 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { getRegistrationWithEventById } from '../../lib/db';
+import { decryptId, encryptId } from '../../lib/crypto';
 
 const { regId } = Astro.params;
-const id = parseInt(regId || '', 10);
+const id = decryptId(regId || '');
 
-if (isNaN(id)) {
+if (id === null) {
   return Astro.redirect('/');
 }
 
@@ -17,7 +18,7 @@ if (!registration) {
 
 // Redirect jika belum lunas
 if (registration.status === 'PENDING') {
-  return Astro.redirect(`/checkout/${registration.id}`);
+  return Astro.redirect(`/checkout/${encryptId(registration.id)}`);
 }
 
 const formatDate = (dateStr: string) => {

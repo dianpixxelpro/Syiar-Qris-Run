@@ -1,6 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import { findRegistrationForUpload } from "../lib/db";
+import { encryptId } from "../lib/crypto";
 
 let errorMsg = "";
 let email = "";
@@ -29,9 +30,9 @@ if (Astro.request.method === "POST") {
 
     if (reg) {
       if (reg.status === "PAID") {
-        return Astro.redirect(`/ticket/${reg.id}`);
+        return Astro.redirect(`/ticket/${encryptId(reg.id)}`);
       } else {
-        return Astro.redirect(`/checkout/${reg.id}?from=cek-status`);
+        return Astro.redirect(`/checkout/${encryptId(reg.id)}?from=cek-status`);
       }
     } else {
       errorMsg =

@@ -1,6 +1,7 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import { getEventById, createRegistration, updateRegistrationAmount } from '../../lib/db';
+import { encryptId } from '../../lib/crypto';
 
 const { id } = Astro.params;
 const eventId = parseInt(id || '', 10);
@@ -73,7 +74,7 @@ if (Astro.request.method === 'POST') {
           const finalAmount = totalBase + uniqueCode;
           await updateRegistrationAmount(regId, finalAmount);
           
-          return Astro.redirect(`/checkout/${regId}`);
+          return Astro.redirect(`/checkout/${encryptId(regId)}`);
         } else {
           errorMsg = 'Gagal memproses pendaftaran. Silakan coba lagi.';
         }

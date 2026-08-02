@@ -61,6 +61,7 @@ export const GET: APIRoute = async ({ request, cookies }) => {
   const total = totalCount ?? 0;
   const totalPages = Math.ceil(total / pageSize);
 
+  const { encryptId } = await import('../../../../lib/crypto');
   const registrations = (data || []).map((dbReg: any) => {
     const limitTime = new Date(dbReg.created_at).getTime() + (30 * 60 * 1000);
     const hasProof = !!dbReg.transaction_time;
@@ -69,6 +70,7 @@ export const GET: APIRoute = async ({ request, cookies }) => {
 
     return {
       id: dbReg.id,
+      encryptedId: encryptId(dbReg.id),
       eventId: dbReg.event_id,
       name: dbReg.name || '',
       email: dbReg.email || '',

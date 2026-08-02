@@ -2,11 +2,12 @@
 import Layout from '../../layouts/Layout.astro';
 import { getRegistrationWithEventById, uploadPaymentProof } from '../../lib/db';
 import { generateDynamicQRIS } from '../../lib/qris';
+import { decryptId } from '../../lib/crypto';
 
 const { regId } = Astro.params;
-const id = parseInt(regId || '', 10);
+const id = decryptId(regId || '');
 
-if (isNaN(id)) {
+if (id === null) {
   return Astro.redirect('/');
 }
 
