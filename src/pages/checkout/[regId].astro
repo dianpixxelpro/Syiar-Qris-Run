@@ -27,6 +27,7 @@ const totalPay = registration.amount;
 
 // Waktu kadaluarsa dimatikan atas permintaan agar semua pendaftar bisa upload
 const isExpired = false;
+const limitTime = new Date(registration.createdAt).getTime() + (30 * 60 * 1000);
 const isFromCekStatus = Astro.url.searchParams.get('from') === 'cek-status';
 
 let successMsg = '';

@@ -1,606 +1,915 @@
 ---
 import AdminLayout from "../../../layouts/AdminLayout.astro";
-import { checkInRegistration } from "../../../lib/db";
-
-let resultMsg = '';
-let statusType: 'success' | 'error' | 'warning' | '' = '';
-let checkedInUser = { name: '', eventTitle: '', id: 0 };
-
-if (Astro.request.method === 'POST') {
-  try {
-    const formData = await Astro.request.formData();
-    const rawTicketId = formData.get('ticketId')?.toString() || '';
-    
-    // Parse ID dari QR Code teks format: "TICKET:QRISRUN-REG-[ID]:..."
-    // Atau jika panitia ketik manual angka ID nya saja
-    let regId = NaN;
-    
-    if (rawTicketId.startsWith('TICKET:QRISRUN-REG-')) {
-      const parts = rawTicketId.split(':');
-      const regIdPart = parts[1].replace('QRISRUN-REG-', '');
-      regId = parseInt(regIdPart, 10);
-    } else {
-      // Ekstrak hanya angka dari input jika user mengetik "#REG-5" atau "REG 5"
-      const match = rawTicketId.match(/\d+/);
-      if (match) {
-        regId = parseInt(match[0], 10);
-      }
-    }
-
-    if (isNaN(regId)) {
-      resultMsg = 'Format Kode Tiket / ID Registrasi tidak valid!';
-      statusType = 'error';
-    } else {
-      const checkinResult = await checkInRegistration(regId);
-      resultMsg = checkinResult.message;
-      
-      if (checkinResult.success) {
-        statusType = 'success';
-        checkedInUser = {
-          name: checkinResult.name || '',
-          eventTitle: checkinResult.eventTitle || '',
-          id: regId
-        };
-      } else {
-        statusType = checkinResult.message.includes('belum lunas') ? 'warning' : 'error';
-        checkedInUser = {
-          name: checkinResult.name || '',
-          eventTitle: checkinResult.eventTitle || '',
-          id: regId
-        };
-      }
-    }
-  } catch (err) {
-    resultMsg = 'Terjadi kesalahan sistem saat memproses check-in.';
-    statusType = 'error';
-    console.error(err);
-  }
-}
 ---
 
-<AdminLayout title="Scanner Check-In Tiket">
+<AdminLayout title="Scanner & Check-In Tiket">
   <!-- Load library HTML5-QRCode via CDN -->
   <script src="https://unpkg.com/html5-qrcode" defer></script>
 
   <section class="checkin-section">
-    
     <div class="container relative z-1 max-width-md">
       
       <div class="checkin-header">
-        <h1 class="checkin-title">Check-In Tiket</h1>
-        <p class="checkin-subtitle">Scan QR Code E-Tiket peserta atau masukkan ID registrasi untuk check-in masuk</p>
+        <h1 class="checkin-title">Check-In & Verifikasi Tiket</h1>
+        <p class="checkin-subtitle">
+          Masukkan ID Registrasi (contoh: <code>#REG-123</code>) untuk melihat data & NIK pendaftar. Lalu scan QR E-Tiket untuk konfirmasi check-in.
+        </p>
       </div>
 
-      <!-- Hasil Status Check-In -->
-      {statusType && (
-        <div class={`checkin-result-alert alert-${statusType}`}>
-          <div class="alert-icon">
-            {statusType === 'success' && '✓'}
-            {statusType === 'error' && '✗'}
-            {statusType === 'warning' && '⚠'}
+      <!-- STEP 1: INITIAL LOOKUP VIEW -->
+      <div id="lookup-section" class="lookup-card glass">
+        <h2 class="section-title">🔍 Cek Data Pendaftar</h2>
+        <p class="section-desc">Masukkan ID registrasi `#REG` di bawah ini untuk mengecek data peserta dan NIK terlebih dahulu.</p>
+
+        <form id="lookup-form" class="lookup-form">
+          <div class="input-group">
+            <span class="input-prefix">#REG-</span>
+            <input 
+              type="text" 
+              id="lookup-input" 
+              placeholder="Contoh: 123"
+              autocomplete="off"
+              required 
+            />
+            <button type="submit" id="lookup-btn" class="btn btn-primary">
+              <span class="btn-text">Cek Data Peserta</span>
+              <span class="btn-spinner hidden">⌛ Loading...</span>
+            </button>
           </div>
-          <div class="alert-body">
-            <h3>{resultMsg}</h3>
-            {checkedInUser.name && (
-              <div class="user-info">
-                ID Pendaftar: <strong>#REG-{checkedInUser.id}</strong> <br />
-                <div style="margin: 0.5rem 0;">
-                  Nama: 
-                  <ul style="margin-top: 0.2rem; padding-left: 1.5rem;">
-                    {(() => {
-                      try {
-                        const parsed = JSON.parse(checkedInUser.name);
-                        if (Array.isArray(parsed) && parsed.length > 0) {
-                          return parsed.map((p: any) => (
-                            <li><strong>{p.name}</strong> <span style="color:var(--accent); font-size:0.9rem;">(Jersey: {p.ukuranJersey})</span></li>
-                          ));
-                        }
-                      } catch(e) {}
-                      return <li><strong>{checkedInUser.name}</strong></li>;
-                    })()}
-                  </ul>
-                </div>
-                Event: <strong>{checkedInUser.eventTitle}</strong>
+        </form>
+
+        <div class="camera-toggle-wrapper">
+          <button id="start-lookup-scan-btn" class="btn btn-outline btn-full">
+            📷 Atau Scan QR Code untuk Cari Data #REG
+          </button>
+          <button id="stop-lookup-scan-btn" class="btn btn-danger btn-full hidden">
+            ❌ Matikan Kamera Lookup
+          </button>
+        </div>
+
+        <!-- Camera Viewport Lookup -->
+        <div id="camera-lookup-viewport-container" class="camera-viewport-wrapper hidden">
+          <div id="reader-lookup"></div>
+        </div>
+
+        <!-- Alert Error Peringatan Input -->
+        <div id="lookup-error-alert" class="alert-box alert-error hidden">
+          <span class="alert-icon">⚠️</span>
+          <span id="lookup-error-msg">Data registrasi tidak ditemukan.</span>
+        </div>
+      </div>
+
+      <!-- STEP 2: VERIFIED DATA CARD VIEW -->
+      <div id="data-result-section" class="data-result-card glass hidden">
+        
+        <div class="result-header">
+          <div class="reg-id-badge">
+            <span class="label">ID REGISTRASI</span>
+            <h2 id="result-reg-id">#REG-0</h2>
+          </div>
+          <div class="status-badges">
+            <span id="badge-payment" class="badge">LUNAS</span>
+            <span id="badge-checkin" class="badge">BELUM CHECK-IN</span>
+          </div>
+        </div>
+
+        <div class="result-grid">
+          <!-- Main Participant Details (Nama + NIK) -->
+          <div class="details-column">
+            <div class="info-card">
+              <h3>👤 Rincian Peserta & Nomor ID / NIK</h3>
+              <div id="participants-list" class="participants-list">
+                <!-- Will be dynamically populated with NIK, Name, Jersey -->
               </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div class="checkin-grid">
-        <!-- Kamera QR Scanner -->
-        <div class="scanner-card glass">
-          <h3>📷 Kamera Scan QR Code</h3>
-          <p class="desc">Izinkan akses kamera HP/Laptop Anda untuk men-scan E-Tiket</p>
-          
-          <div class="camera-viewport-wrapper">
-            <div id="reader"></div>
-          </div>
-          
-          <div class="scanner-controls" style="margin-top: 1rem;">
-            <button id="start-scan-btn" class="btn btn-primary btn-full">Aktifkan Kamera</button>
-            <button id="stop-scan-btn" class="btn btn-outline btn-full hidden">Matikan Kamera</button>
-          </div>
-        </div>
-
-        <!-- Manual Input -->
-        <div class="manual-card glass">
-          <h3>✍️ Check-In Manual</h3>
-          <p class="desc">Gunakan ini jika kamera bermasalah atau untuk input manual</p>
-          
-          <form method="POST" class="manual-form" id="manual-checkin-form">
-            <div class="form-group">
-              <label for="ticketId">ID Registrasi / Kode Tiket</label>
-              <input 
-                type="text" 
-                id="ticketId" 
-                name="ticketId" 
-                placeholder="Contoh: 1 atau TICKET:QRISRUN-REG-1..."
-                required 
-              />
             </div>
+
+            <div class="info-card">
+              <h3>📱 Detail Kontak</h3>
+              <div class="info-row">
+                <span class="info-label">WhatsApp:</span>
+                <span id="result-phone" class="info-val">-</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Email:</span>
+                <span id="result-email" class="info-val">-</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Event:</span>
+                <span id="result-event" class="info-val">-</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Column: Camera QR Confirmation Only -->
+          <div class="action-column">
             
-            <button type="submit" class="btn btn-accent btn-full">Validasi Masuk</button>
-          </form>
+            <!-- Box jika SIAP CHECK-IN via Kamera Scan -->
+            <div id="checkin-ready-box" class="action-box box-ready hidden">
+              <div class="action-header">
+                <span class="icon">📷</span>
+                <h4>Scan QR Code untuk Konfirmasi Check-In</h4>
+              </div>
+              <p>Data peserta dan NIK telah sesuai. Silakan aktifkan kamera dan scan QR Code pada E-Tiket peserta untuk menyelesaikan Check-In.</p>
+
+              <div class="confirm-camera-wrapper">
+                <button id="start-confirm-scan-btn" class="btn btn-success btn-full btn-lg">
+                  📷 Buka Kamera & Scan QR Tiket
+                </button>
+                <button id="stop-confirm-scan-btn" class="btn btn-danger btn-full hidden">
+                  ❌ Matikan Kamera Scan
+                </button>
+              </div>
+
+              <!-- Camera Viewport Confirm -->
+              <div id="camera-confirm-viewport-container" class="camera-viewport-wrapper hidden mt-3">
+                <div id="reader-confirm"></div>
+              </div>
+            </div>
+
+            <!-- Box jika SUDAH CHECK-IN -->
+            <div id="checkin-already-box" class="action-box box-warning hidden">
+              <div class="action-header">
+                <span class="icon">⚠️</span>
+                <h4>Sudah Check-In Sebelumnya</h4>
+              </div>
+              <p>Peserta ini <strong>SUDAH</strong> pernah melakukan check-in dan mengambil Race Pack.</p>
+            </div>
+
+            <!-- Box jika BELUM LUNAS / PENDING -->
+            <div id="checkin-unpaid-box" class="action-box box-danger hidden">
+              <div class="action-header">
+                <span class="icon">❌</span>
+                <h4>Pembayaran Belum Lunas</h4>
+              </div>
+              <p>Tiket ini statusnya masih <strong>PENDING / UNPAID</strong>. Silakan minta peserta melunasi pembayaran terlebih dahulu sebelum check-in.</p>
+            </div>
+
+            <!-- Notification Feedback Status Check-In -->
+            <div id="action-feedback-alert" class="alert-box hidden">
+              <span id="action-feedback-icon" class="alert-icon"></span>
+              <span id="action-feedback-msg"></span>
+            </div>
+
+            <!-- Tombol Kembali / Reset -->
+            <button id="reset-lookup-btn" class="btn btn-outline btn-full">
+              🔄 Cek #REG Lain / Kembali
+            </button>
+          </div>
         </div>
+
       </div>
+
     </div>
   </section>
-
-  <!-- Hidden Form untuk mengirim hasil scan kamera -->
-  <form id="qr-submit-form" method="POST" class="hidden">
-    <input type="hidden" id="qr-ticket-id-input" name="ticketId" />
-  </form>
 </AdminLayout>
 
 <script>
-  // Client-Side Scanner Logic
-  let html5QrCode: any = null;
+  let html5QrCodeLookup: any = null;
+  let html5QrCodeConfirm: any = null;
+  let currentLoadedRegId: number | null = null;
 
   window.addEventListener('DOMContentLoaded', () => {
-    const startBtn = document.getElementById('start-scan-btn');
-    const stopBtn = document.getElementById('stop-scan-btn');
-    const submitForm = document.getElementById('qr-submit-form') as HTMLFormElement;
-    const ticketInput = document.getElementById('qr-ticket-id-input') as HTMLInputElement;
+    const lookupForm = document.getElementById('lookup-form') as HTMLFormElement;
+    const lookupInput = document.getElementById('lookup-input') as HTMLInputElement;
+    const lookupBtn = document.getElementById('lookup-btn') as HTMLButtonElement;
+    const lookupSection = document.getElementById('lookup-section')!;
+    const lookupErrorAlert = document.getElementById('lookup-error-alert')!;
+    const lookupErrorMsg = document.getElementById('lookup-error-msg')!;
 
-    if (!startBtn || !stopBtn || !submitForm || !ticketInput) return;
+    const dataResultSection = document.getElementById('data-result-section')!;
+    const resultRegId = document.getElementById('result-reg-id')!;
+    const badgePayment = document.getElementById('badge-payment')!;
+    const badgeCheckin = document.getElementById('badge-checkin')!;
+    const participantsList = document.getElementById('participants-list')!;
+    const resultPhone = document.getElementById('result-phone')!;
+    const resultEmail = document.getElementById('result-email')!;
+    const resultEvent = document.getElementById('result-event')!;
 
-    // Inisialisasi html5-qrcode
-    startBtn.addEventListener('click', () => {
+    const checkinReadyBox = document.getElementById('checkin-ready-box')!;
+    const checkinAlreadyBox = document.getElementById('checkin-already-box')!;
+    const checkinUnpaidBox = document.getElementById('checkin-unpaid-box')!;
+    
+    const actionFeedbackAlert = document.getElementById('action-feedback-alert')!;
+    const actionFeedbackIcon = document.getElementById('action-feedback-icon')!;
+    const actionFeedbackMsg = document.getElementById('action-feedback-msg')!;
+
+    const resetLookupBtn = document.getElementById('reset-lookup-btn')!;
+    
+    // Scanner Lookup Elements
+    const startLookupScanBtn = document.getElementById('start-lookup-scan-btn')!;
+    const stopLookupScanBtn = document.getElementById('stop-lookup-scan-btn')!;
+    const cameraLookupViewportContainer = document.getElementById('camera-lookup-viewport-container')!;
+
+    // Scanner Confirm Elements
+    const startConfirmScanBtn = document.getElementById('start-confirm-scan-btn')!;
+    const stopConfirmScanBtn = document.getElementById('stop-confirm-scan-btn')!;
+    const cameraConfirmViewportContainer = document.getElementById('camera-confirm-viewport-container')!;
+
+    // --- FUNCTION: Lookup Registration Data ---
+    async function fetchRegistrationData(query: string) {
+      showLookupError('');
+      setLoading(lookupBtn, true);
+
+      try {
+        const res = await fetch(`/mlebuodewe/admin/api/checkin?query=${encodeURIComponent(query)}`);
+        const json = await res.json();
+
+        if (!json.success || !json.data) {
+          showLookupError(json.message || 'Data registrasi tidak ditemukan.');
+          return;
+        }
+
+        renderParticipantData(json.data);
+      } catch (err) {
+        console.error('Error fetching checkin data:', err);
+        showLookupError('Terjadi kesalahan jaringan/server saat mengecek data.');
+      } finally {
+        setLoading(lookupBtn, false);
+      }
+    }
+
+    // --- FUNCTION: Execute Check-In ---
+    async function executeCheckIn(regId: number) {
+      setActionFeedback('', '');
+
+      try {
+        const res = await fetch('/mlebuodewe/admin/api/checkin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: regId })
+        });
+        const json = await res.json();
+
+        if (json.success) {
+          setActionFeedback('success', '✓ Check-In Berhasil! ' + (json.message || 'Data telah diperbarui.'));
+          // Update UI badge & action boxes
+          badgeCheckin.className = 'badge badge-success';
+          badgeCheckin.textContent = 'SUDAH CHECK-IN';
+          
+          checkinReadyBox.classList.add('hidden');
+          checkinAlreadyBox.classList.remove('hidden');
+        } else {
+          setActionFeedback('error', '✗ ' + (json.message || 'Gagal memproses check-in.'));
+        }
+      } catch (err) {
+        console.error('Error executing checkin:', err);
+        setActionFeedback('error', '✗ Terjadi kesalahan sistem saat memproses check-in.');
+      }
+    }
+
+    // --- RENDER DATA TO UI (TERMASUK NIK) ---
+    function renderParticipantData(data: any) {
+      currentLoadedRegId = data.id;
+      
+      // Stop any active scanners
+      stopLookupScanner();
+      stopConfirmScanner();
+
+      resultRegId.textContent = `#REG-${data.id}`;
+      resultPhone.textContent = data.phone || '-';
+      resultEmail.textContent = data.email || '-';
+      resultEvent.textContent = data.eventTitle || 'Syiar QRIS Run';
+
+      // Render participants list with NIK
+      participantsList.innerHTML = '';
+      if (Array.isArray(data.participants) && data.participants.length > 0) {
+        data.participants.forEach((p: any, idx: number) => {
+          const item = document.createElement('div');
+          item.className = 'participant-item';
+          
+          const nikVal = p.nomorId || p.nik || p.idCard || '-';
+          const jenisIdVal = p.jenisId || 'NIK/ID';
+
+          item.innerHTML = `
+            <div class="p-number">${idx + 1}</div>
+            <div class="p-details">
+              <strong class="p-name">${p.name || 'Peserta'}</strong>
+              <div class="p-nik-box">
+                💳 <span class="nik-label">${jenisIdVal}:</span> <strong class="nik-value">${nikVal}</strong>
+              </div>
+              <div class="p-meta">
+                ${p.ukuranJersey ? `<span class="badge-sub">Jersey: <strong>${p.ukuranJersey}</strong></span>` : ''}
+                ${p.jenisKelamin ? `<span class="badge-sub">Gender: <strong>${p.jenisKelamin}</strong></span>` : ''}
+                ${p.kategori ? `<span class="badge-sub">Kategori: <strong>${p.kategori}</strong></span>` : ''}
+              </div>
+            </div>
+          `;
+          participantsList.appendChild(item);
+        });
+      } else {
+        participantsList.innerHTML = `
+          <div class="participant-item">
+            <div class="p-details">
+              <strong class="p-name">${data.name}</strong>
+            </div>
+          </div>
+        `;
+      }
+
+      // Status Payment
+      if (data.status === 'PAID') {
+        badgePayment.className = 'badge badge-success';
+        badgePayment.textContent = 'LUNAS';
+      } else if (data.status === 'EXPIRED') {
+        badgePayment.className = 'badge badge-danger';
+        badgePayment.textContent = 'EXPIRED';
+      } else {
+        badgePayment.className = 'badge badge-warning';
+        badgePayment.textContent = 'PENDING';
+      }
+
+      // Status Checkin & Action Boxes
+      checkinReadyBox.classList.add('hidden');
+      checkinAlreadyBox.classList.add('hidden');
+      checkinUnpaidBox.classList.add('hidden');
+      setActionFeedback('', '');
+
+      if (data.checkedIn) {
+        badgeCheckin.className = 'badge badge-success';
+        badgeCheckin.textContent = 'SUDAH CHECK-IN';
+        checkinAlreadyBox.classList.remove('hidden');
+      } else {
+        badgeCheckin.className = 'badge badge-warning';
+        badgeCheckin.textContent = 'BELUM CHECK-IN';
+
+        if (data.status === 'PAID') {
+          checkinReadyBox.classList.remove('hidden');
+        } else {
+          checkinUnpaidBox.classList.remove('hidden');
+        }
+      }
+
+      // Switch view
+      lookupSection.classList.add('hidden');
+      dataResultSection.classList.remove('hidden');
+    }
+
+    // --- UI HELPER FUNCTIONS ---
+    function showLookupError(msg: string) {
+      if (msg) {
+        lookupErrorMsg.textContent = msg;
+        lookupErrorAlert.classList.remove('hidden');
+      } else {
+        lookupErrorAlert.classList.add('hidden');
+      }
+    }
+
+    function setActionFeedback(type: 'success' | 'error' | '', msg: string) {
+      if (!type) {
+        actionFeedbackAlert.className = 'alert-box hidden';
+        return;
+      }
+      actionFeedbackAlert.className = `alert-box alert-${type}`;
+      actionFeedbackIcon.textContent = type === 'success' ? '✓' : '✗';
+      actionFeedbackMsg.textContent = msg;
+    }
+
+    function setLoading(btn: HTMLButtonElement, loading: boolean) {
+      const textSpan = btn.querySelector('.btn-text');
+      const spinnerSpan = btn.querySelector('.btn-spinner');
+      if (loading) {
+        btn.disabled = true;
+        if (textSpan) textSpan.classList.add('hidden');
+        if (spinnerSpan) spinnerSpan.classList.remove('hidden');
+      } else {
+        btn.disabled = false;
+        if (textSpan) textSpan.classList.remove('hidden');
+        if (spinnerSpan) spinnerSpan.classList.add('hidden');
+      }
+    }
+
+    function resetToLookupView() {
+      stopLookupScanner();
+      stopConfirmScanner();
+      currentLoadedRegId = null;
+      lookupInput.value = '';
+      showLookupError('');
+      dataResultSection.classList.add('hidden');
+      lookupSection.classList.remove('hidden');
+      lookupInput.focus();
+    }
+
+    // --- EVENT LISTENERS ---
+    lookupForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const val = lookupInput.value.trim();
+      if (val) {
+        fetchRegistrationData(val);
+      }
+    });
+
+    resetLookupBtn.addEventListener('click', () => {
+      resetToLookupView();
+    });
+
+    // --- LOOKUP SCANNER LOGIC ---
+    function startLookupScanner() {
       // @ts-ignore
       if (typeof Html5Qrcode === 'undefined') {
-        alert('Library scanner QR sedang dimuat. Mohon tunggu 1-2 detik dan coba lagi.');
+        alert('Library QR scanner sedang dimuat, mohon tunggu beberapa detik.');
         return;
       }
 
-      startBtn.classList.add('hidden');
-      stopBtn.classList.remove('hidden');
+      startLookupScanBtn.classList.add('hidden');
+      stopLookupScanBtn.classList.remove('hidden');
+      cameraLookupViewportContainer.classList.remove('hidden');
 
       // @ts-ignore
-      html5QrCode = new Html5Qrcode("reader");
-      
-      const config = { fps: 10, qrbox: { width: 200, height: 200 }, aspectRatio: 1.777778 };
+      html5QrCodeLookup = new Html5Qrcode("reader-lookup");
+      const config = { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.777778 };
 
-      html5QrCode.start(
-        { facingMode: "environment" }, // Prioritaskan kamera belakang untuk HP
+      html5QrCodeLookup.start(
+        { facingMode: "environment" },
         config,
         (decodedText: string) => {
-          // Callback jika QR berhasil dideteksi
-          html5QrCode.stop().then(() => {
-            // Set value input dan submit POST form
-            ticketInput.value = decodedText;
-            submitForm.submit();
-          }).catch((err: any) => {
-            console.error('Gagal menghentikan scanner:', err);
-          });
+          lookupInput.value = decodedText;
+          fetchRegistrationData(decodedText);
+          stopLookupScanner();
         },
-        (errorMessage: string) => {
-          // Scanner verbose logs (diabaikan saja agar konsol tidak berantakan)
-        }
+        () => { /* Verbose logs ignored */ }
       ).catch((err: any) => {
-        console.error('Kamera gagal dimulai:', err);
-        alert('Gagal mengakses kamera. Berikan izin akses kamera pada browser Anda.');
-        startBtn.classList.remove('hidden');
-        stopBtn.classList.add('hidden');
+        console.error('Kamera lookup gagal:', err);
+        alert('Gagal mengakses kamera. Berikan izin akses kamera.');
+        stopLookupScanner();
       });
-    });
+    }
 
-    stopBtn.addEventListener('click', () => {
-      if (html5QrCode) {
-        html5QrCode.stop().then(() => {
-          startBtn.classList.remove('hidden');
-          stopBtn.classList.add('hidden');
-        }).catch((err: any) => {
-          console.error(err);
+    function stopLookupScanner() {
+      if (html5QrCodeLookup) {
+        html5QrCodeLookup.stop().then(() => {
+          html5QrCodeLookup = null;
+        }).catch(() => {
+          html5QrCodeLookup = null;
         });
       }
-    });
+      startLookupScanBtn.classList.remove('hidden');
+      stopLookupScanBtn.classList.add('hidden');
+      cameraLookupViewportContainer.classList.add('hidden');
+    }
+
+    startLookupScanBtn.addEventListener('click', startLookupScanner);
+    stopLookupScanBtn.addEventListener('click', stopLookupScanner);
+
+    // --- CONFIRM SCANNER LOGIC (Kamera Scan untuk Check-In setelah Data Cocok) ---
+    function startConfirmScanner() {
+      // @ts-ignore
+      if (typeof Html5Qrcode === 'undefined') {
+        alert('Library QR scanner sedang dimuat, mohon tunggu beberapa detik.');
+        return;
+      }
+
+      startConfirmScanBtn.classList.add('hidden');
+      stopConfirmScanBtn.classList.remove('hidden');
+      cameraConfirmViewportContainer.classList.remove('hidden');
+
+      // @ts-ignore
+      html5QrCodeConfirm = new Html5Qrcode("reader-confirm");
+      const config = { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1.777778 };
+
+      html5QrCodeConfirm.start(
+        { facingMode: "environment" },
+        config,
+        (decodedText: string) => {
+          // Parse scanned QR code ID
+          let scannedId: number | null = null;
+          if (decodedText.startsWith('TICKET:QRISRUN-REG-')) {
+            const parts = decodedText.split(':');
+            if (parts.length > 1) {
+              scannedId = parseInt(parts[1].replace('QRISRUN-REG-', ''), 10);
+            }
+          } else {
+            const match = decodedText.match(/\d+/);
+            if (match) scannedId = parseInt(match[0], 10);
+          }
+
+          if (scannedId && currentLoadedRegId && scannedId === currentLoadedRegId) {
+            // QR Code ID Matches! Execute Check-In!
+            executeCheckIn(currentLoadedRegId);
+            stopConfirmScanner();
+          } else if (scannedId) {
+            setActionFeedback('error', `❌ QR Code yang di-scan (#REG-${scannedId}) TIDAK COCOK dengan data yang sedang dibuka (#REG-${currentLoadedRegId})!`);
+          } else {
+            setActionFeedback('error', '❌ QR Code tidak valid.');
+          }
+        },
+        () => { /* Verbose logs ignored */ }
+      ).catch((err: any) => {
+        console.error('Kamera confirm gagal:', err);
+        alert('Gagal mengakses kamera. Berikan izin akses kamera.');
+        stopConfirmScanner();
+      });
+    }
+
+    function stopConfirmScanner() {
+      if (html5QrCodeConfirm) {
+        html5QrCodeConfirm.stop().then(() => {
+          html5QrCodeConfirm = null;
+        }).catch(() => {
+          html5QrCodeConfirm = null;
+        });
+      }
+      startConfirmScanBtn.classList.remove('hidden');
+      stopConfirmScanBtn.classList.add('hidden');
+      cameraConfirmViewportContainer.classList.add('hidden');
+    }
+
+    startConfirmScanBtn.addEventListener('click', startConfirmScanner);
+    stopConfirmScanBtn.addEventListener('click', stopConfirmScanner);
   });
 </script>
 
 <style>
   .checkin-section {
-    padding: 3rem 0;
-    position: relative;
-    min-height: calc(100vh - 72px - 300px);
+    padding: 2.5rem 0;
+    min-height: calc(100vh - 120px);
   }
 
   .max-width-md {
-    max-width: 900px;
-  }
-
-  .checkin-glow {
-    top: 5%;
-    right: 5%;
-    width: 400px;
-    height: 400px;
-    background-color: var(--accent-glow);
+    max-width: 860px;
   }
 
   .checkin-header {
-    margin-bottom: 2.5rem;
-  }
-
-  .back-link {
-    font-size: 0.95rem;
-    color: var(--primary);
-    font-weight: 600;
-    margin-bottom: 0.75rem;
-    display: inline-block;
-  }
-
-  .back-link:hover {
-    color: #60a5fa;
+    margin-bottom: 2rem;
+    text-align: center;
   }
 
   .checkin-title {
     font-size: 2.25rem;
     font-weight: 800;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
   }
 
   .checkin-subtitle {
     color: var(--text-secondary);
     font-size: 1rem;
+    max-width: 600px;
+    margin: 0 auto;
   }
 
-  /* Result Alert Box */
-  .checkin-result-alert {
-    display: flex;
-    gap: 1.5rem;
-    padding: 1.5rem 2rem;
-    border-radius: var(--radius-lg);
-    margin-bottom: 2.5rem;
-    align-items: center;
+  .checkin-subtitle code {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    color: var(--accent);
+    font-weight: 600;
   }
 
-  .checkin-result-alert.alert-success {
-    background-color: rgba(16, 185, 129, 0.12);
-    color: var(--success);
-    border: 1px solid rgba(16, 185, 129, 0.3);
+  /* GLASS CARD STYLES */
+  .lookup-card, .data-result-card {
+    background: var(--bg-card, rgba(30, 41, 59, 0.7));
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+    border-radius: var(--radius-lg, 16px);
+    padding: 2.5rem;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
   }
 
-  .checkin-result-alert.alert-error {
-    background-color: rgba(239, 68, 68, 0.12);
-    color: var(--danger);
-    border: 1px solid rgba(239, 68, 68, 0.3);
+  .section-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
   }
 
-  .checkin-result-alert.alert-warning {
-    background-color: rgba(245, 158, 11, 0.12);
-    color: var(--warning);
-    border: 1px solid rgba(245, 158, 11, 0.3);
-  }
-
-  .alert-icon {
-    font-size: 2.25rem;
-    font-weight: bold;
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid currentColor;
-    flex-shrink: 0;
-  }
-
-  .alert-body h3 {
-    font-size: 1.25rem;
-    margin-bottom: 0.25rem;
-  }
-
-  .alert-body .user-info {
-    color: var(--text-primary);
-    font-size: 0.9rem;
-    line-height: 1.5;
-  }
-
-  /* Grid Layout */
-  .checkin-grid {
-    display: grid;
-    grid-template-columns: 1.2fr 0.8fr;
-    gap: 2.5rem;
-    align-items: start;
-  }
-
-  .scanner-card, .manual-card {
-    border-radius: var(--radius-lg);
-    padding: 2rem;
-    border: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .scanner-card h3, .manual-card h3 {
-    font-size: 1.3rem;
-  }
-
-  .desc {
-    font-size: 0.85rem;
+  .section-desc {
     color: var(--text-secondary);
-    line-height: 1.4;
+    font-size: 0.95rem;
+    margin-bottom: 1.75rem;
+  }
+
+  /* LOOKUP FORM */
+  .lookup-form {
+    margin-bottom: 1.5rem;
+  }
+
+  .input-group {
+    display: flex;
+    align-items: center;
+    background-color: var(--bg-primary, #0f172a);
+    border: 2px solid var(--border-color, rgba(255, 255, 255, 0.15));
+    border-radius: var(--radius-md, 10px);
+    overflow: hidden;
+    transition: border-color 0.2s ease;
+  }
+
+  .input-group:focus-within {
+    border-color: var(--accent, #3b82f6);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+  }
+
+  .input-prefix {
+    padding: 0.9rem 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--accent, #3b82f6);
+    font-weight: 800;
+    font-size: 1.1rem;
+    border-right: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  }
+
+  .input-group input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    padding: 0.9rem 1rem;
+    color: #fff;
+    font-size: 1.1rem;
+    outline: none;
+  }
+
+  .input-group .btn {
+    border-radius: 0;
+    padding: 0.9rem 1.75rem;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .camera-toggle-wrapper {
+    margin-top: 1rem;
   }
 
   .camera-viewport-wrapper {
+    margin-top: 1.5rem;
     background-color: #000;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-md, 12px);
     overflow: hidden;
-    height: 240px; /* Force a short fixed height */
-    border: 1px solid var(--border-color);
-    position: relative;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    border: 2px solid var(--accent, #3b82f6);
+    max-height: 300px;
   }
 
-  #reader {
-    width: 100% !important;
-  }
-
-  #reader {
+  #reader-lookup, #reader-confirm {
     width: 100%;
-    height: 100%;
   }
 
-  /* Untuk merapikan tombol-tombol internal html5-qrcode (jika ada) */
-  #reader video {
+  #reader-lookup video, #reader-confirm video {
     object-fit: cover !important;
   }
 
-  .scanner-controls {
+  /* ALERT BOX */
+  .alert-box {
     display: flex;
-    gap: 1rem;
-    margin-top: 0.5rem;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    border-radius: var(--radius-md, 10px);
+    margin-top: 1.25rem;
+    font-size: 0.95rem;
+    font-weight: 600;
   }
 
-  /* Manual Form */
-  .manual-form {
+  .alert-error, .alert-box.alert-error {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #f87171;
+  }
+
+  .alert-success, .alert-box.alert-success {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: #34d399;
+  }
+
+  /* DATA RESULT VIEW */
+  .result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .reg-id-badge .label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+  }
+
+  .reg-id-badge h2 {
+    font-size: 2.25rem;
+    font-weight: 900;
+    color: var(--accent, #3b82f6);
+    margin: 0;
+    line-height: 1.1;
+  }
+
+  .status-badges {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .badge {
+    padding: 0.4rem 0.9rem;
+    border-radius: 9999px;
+    font-size: 0.85rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  .badge-success {
+    background: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+  }
+
+  .badge-warning {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+  }
+
+  .badge-danger {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.4);
+  }
+
+  /* RESULT GRID */
+  .result-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  .details-column {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    margin-top: 0.5rem;
   }
 
-  .form-group {
+  .info-card {
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+    border-radius: var(--radius-md, 12px);
+    padding: 1.5rem;
+  }
+
+  .info-card h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+  }
+
+  .participants-list {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.85rem;
   }
 
-  .form-group label {
+  .participant-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 1rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .p-number {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--accent, #3b82f6);
+    color: #fff;
+    font-weight: 800;
     font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
   }
 
-  .form-group input {
-    background-color: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    padding: 0.8rem 1rem;
-    color: var(--text-primary);
+  .p-details {
+    flex: 1;
+  }
+
+  .p-name {
+    font-size: 1.1rem;
+    display: block;
+    color: #fff;
+    font-weight: 700;
+  }
+
+  .p-nik-box {
+    margin-top: 0.35rem;
     font-size: 0.95rem;
-  }
-
-  .form-group input:focus {
-    outline: none;
-    border-color: var(--accent);
-  }
-      if (html5QrCode) {
-        html5QrCode.stop().then(() => {
-          startBtn.classList.remove('hidden');
-          stopBtn.classList.add('hidden');
-        }).catch((err: any) => {
-          console.error(err);
-        });
-      }
-    });
-  });
-</script>
-
-<style>
-  .checkin-section {
-    padding: 3rem 0;
-    position: relative;
-    min-height: calc(100vh - 72px - 300px);
-  }
-
-  .max-width-md {
-    max-width: 900px;
-  }
-
-  .checkin-glow {
-    top: 5%;
-    right: 5%;
-    width: 400px;
-    height: 400px;
-    background-color: var(--accent-glow);
-  }
-
-  .checkin-header {
-    margin-bottom: 2.5rem;
-  }
-
-  .back-link {
-    font-size: 0.95rem;
-    color: var(--primary);
-    font-weight: 600;
-    margin-bottom: 0.75rem;
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
     display: inline-block;
   }
 
-  .back-link:hover {
+  .nik-label {
+    color: var(--text-secondary);
+  }
+
+  .nik-value {
     color: #60a5fa;
-  }
-
-  .checkin-title {
-    font-size: 2.25rem;
-    font-weight: 800;
-  }
-
-  .checkin-subtitle {
-    color: var(--text-secondary);
     font-size: 1rem;
+    letter-spacing: 0.03em;
   }
 
-  /* Result Alert Box */
-  .checkin-result-alert {
+  .p-meta {
     display: flex;
-    gap: 1.5rem;
-    padding: 1.5rem 2rem;
-    border-radius: var(--radius-lg);
-    margin-bottom: 2.5rem;
-    align-items: center;
-  }
-
-  .checkin-result-alert.alert-success {
-    background-color: rgba(16, 185, 129, 0.12);
-    color: var(--success);
-    border: 1px solid rgba(16, 185, 129, 0.3);
-  }
-
-  .checkin-result-alert.alert-error {
-    background-color: rgba(239, 68, 68, 0.12);
-    color: var(--danger);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-  }
-
-  .checkin-result-alert.alert-warning {
-    background-color: rgba(245, 158, 11, 0.12);
-    color: var(--warning);
-    border: 1px solid rgba(245, 158, 11, 0.3);
-  }
-
-  .alert-icon {
-    font-size: 2.25rem;
-    font-weight: bold;
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid currentColor;
-    flex-shrink: 0;
-  }
-
-  .alert-body h3 {
-    font-size: 1.25rem;
-    margin-bottom: 0.25rem;
-  }
-
-  .alert-body .user-info {
-    color: var(--text-primary);
-    font-size: 0.9rem;
-    line-height: 1.5;
-  }
-
-  /* Grid Layout */
-  .checkin-grid {
-    display: grid;
-    grid-template-columns: 1.2fr 0.8fr;
-    gap: 2.5rem;
-    align-items: start;
-  }
-
-  .scanner-card, .manual-card {
-    border-radius: var(--radius-lg);
-    padding: 2rem;
-    border: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .scanner-card h3, .manual-card h3 {
-    font-size: 1.3rem;
-  }
-
-  .desc {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    line-height: 1.4;
-  }
-
-  /* Camera Viewport */
-  .camera-viewport-wrapper {
-    background-color: #000;
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    aspect-ratio: 4/3;
-    border: 1px solid var(--border-color);
-    position: relative;
-  }
-
-  #reader {
-    width: 100%;
-    height: 100%;
-  }
-
-  /* Untuk merapikan tombol-tombol internal html5-qrcode (jika ada) */
-  #reader video {
-    object-fit: cover !important;
-  }
-
-  .scanner-controls {
-    display: flex;
-    gap: 1rem;
-    margin-top: 0.5rem;
-  }
-
-  /* Manual Form */
-  .manual-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    margin-top: 0.5rem;
-  }
-
-  .form-group {
-    display: flex;
-    flex-direction: column;
     gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
   }
 
-  .form-group label {
-    font-size: 0.85rem;
-    font-weight: 600;
+  .badge-sub {
+    font-size: 0.8rem;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
     color: var(--text-secondary);
   }
 
-  .form-group input {
-    background-color: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    padding: 0.8rem 1rem;
-    color: var(--text-primary);
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
     font-size: 0.95rem;
   }
 
-  .form-group input:focus {
-    outline: none;
-    border-color: var(--accent);
+  .info-row:last-child {
+    border-bottom: none;
+  }
+
+  .info-label {
+    color: var(--text-secondary);
+  }
+
+  .info-val {
+    font-weight: 600;
+    color: #fff;
+  }
+
+  /* ACTION COLUMN */
+  .action-column {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .action-box {
+    border-radius: var(--radius-md, 12px);
+    padding: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .box-ready {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+
+  .box-warning {
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+  }
+
+  .box-danger {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
+  .action-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .action-header .icon {
+    font-size: 1.5rem;
+  }
+
+  .action-header h4 {
+    font-size: 1.15rem;
+    font-weight: 800;
+  }
+
+  .action-box p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .btn-lg {
+    padding: 1.1rem 1.5rem !important;
+    font-size: 1.05rem !important;
+    font-weight: 800 !important;
   }
 
   .btn-full {
@@ -612,7 +921,7 @@ if (Astro.request.method === 'POST') {
   }
 
   @media (max-width: 768px) {
-    .checkin-grid {
+    .result-grid {
       grid-template-columns: 1fr;
     }
   }
