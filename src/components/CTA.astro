@@ -1,25 +1,15 @@
 ---
 // CTA.astro
-// Cek apakah pendaftaran sudah dibuka (31 Juli 2026, 08:00 WIB)
-const registrationOpenDate = new Date('2026-07-31T08:00:00+07:00');
-const isRegistrationOpen = new Date() >= registrationOpenDate;
 ---
 
 <section class="cta-section">
   <div class="container cta-container">
     <div class="cta-card glass">
       <h2 class="cta-title">Siap Mengikuti Syiar QRIS Run 2026?</h2>
-      <p class="cta-desc">
+      <p class="cta-desc" style="margin-bottom: 0;">
         Tunjukkan Race terbaik kalian dengan menjadi finisher yang akan
         mendapatkan medali eksklusif. Dapatkan Achievement kalian!
       </p>
-      <div class="cta-actions">
-        {isRegistrationOpen ? (
-          <a href="/events/1" class="btn btn-accent cta-btn">Daftar Sekarang</a>
-        ) : (
-          <button class="btn cta-btn" style="background-color: #6b7280; color: white; cursor: not-allowed; opacity: 0.8;" disabled>Dibuka 31 Juli 2026</button>
-        )}
-      </div>
     </div>
   </div>
 </section>

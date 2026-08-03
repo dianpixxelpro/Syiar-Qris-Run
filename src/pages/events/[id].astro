@@ -12,7 +12,8 @@ if (isNaN(eventId)) {
 
 const event = await getEventById(eventId);
 
-if (!event) {
+const isRegistrationFinished = true;
+if (!event || isRegistrationFinished) {
   return Astro.redirect('/');
 }
 
@@ -46,7 +47,7 @@ if (Astro.request.method === 'POST') {
 
       if (participants.length === 0 || !email || !phone) {
         errorMsg = 'Data peserta, email, dan nomor WhatsApp wajib diisi!';
-      } else if (event.registered + participants.length > 1379) {
+      } else if (event.registered + participants.length > event.slots) {
         errorMsg = 'Maaf, sisa kuota pendaftaran tidak mencukupi untuk jumlah peserta ini.';
       } else {
         // Gunakan harga asli event dari database
@@ -97,7 +98,7 @@ const formatPrice = (price: number) => {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
 };
 
-const isFull = true; // event.registered >= 1379;
+const isFull = event.registered >= event.slots;
 const isFinished = event.status === 'FINISHED';
 ---
 
@@ -130,10 +131,10 @@ const isFinished = event.status === 'FINISHED';
               <div class="kuota-info">
                 <div class="kuota-label">
                   <span>Data Peserta yang berhasil upload bukti pembayaran</span>
-                  <span>{event.registered} / 1500 Slot</span>
+                  <span>{event.registered} / {event.slots} Slot</span>
                 </div>
                 <div class="progress-bar">
-                  <div class="progress-fill" style={`width: ${Math.min((event.registered / 1500) * 100, 100)}%;`}></div>
+                  <div class="progress-fill" style={`width: ${Math.min((event.registered / (event.slots || 1500)) * 100, 100)}%;`}></div>
                 </div>
               </div>
 

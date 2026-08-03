@@ -322,13 +322,47 @@ export async function getRegistrationWithEventById(id: number): Promise<(Registr
   };
 }
 
+export async function safeIncrementEventRegistered(eventId: number, count: number): Promise<boolean> {
+  const maxRetries = 3;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const { data: event, error: fetchErr } = await supabase
+      .from('events')
+      .select('id, registered, slots')
+      .eq('id', eventId)
+      .single();
+
+    if (fetchErr || !event) return false;
+
+    // Cek batas kuota dinamis berdasarkan event.slots
+    if (event.registered + count > event.slots) {
+      console.warn(`Batas kuota tercapai untuk event ${eventId}: ${event.registered} + ${count} > ${event.slots}`);
+      return false;
+    }
+
+    const currentReg = event.registered;
+    const newReg = currentReg + count;
+
+    // Optimistic Locking: hanya update jika registered tidak berubah saat dibaca
+    const { data: updated, error: updateErr } = await supabase
+      .from('events')
+      .update({ registered: newReg })
+      .eq('id', eventId)
+      .eq('registered', currentReg)
+      .select('id');
+
+    if (!updateErr && updated && updated.length > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export async function updateRegistrationStatus(id: number, status: 'PENDING' | 'PAID' | 'EXPIRED'): Promise<boolean> {
   const currentReg = await getRegistrationById(id);
   if (!currentReg) return false;
 
   // Jika status berubah dari PENDING/EXPIRED ke PAID
   if ((currentReg.status === 'PENDING' || currentReg.status === 'EXPIRED') && status === 'PAID') {
-    // Jalankan update berurutan (di Supabase kita lakukan step by step karena tidak ada block transaction langsung lewat client)
     const { error: regError } = await supabase
       .from('registrations')
       .update({ status: 'PAID' })
@@ -343,28 +377,15 @@ export async function updateRegistrationStatus(id: number, status: 'PENDING' | '
     const alreadyIncremented = !!currentReg.paymentProof;
 
     if (!alreadyIncremented) {
-      // Ambil detail event saat ini untuk meningkatkan registered count
-      const event = await getEventById(currentReg.eventId);
-      if (event) {
-        let participantCount = 1;
-        try {
-          const parsed = JSON.parse(currentReg.name);
-          if (Array.isArray(parsed)) {
-            participantCount = parsed.length;
-          }
-        } catch (e) {
-          // Fallback to 1 if not JSON
+      let participantCount = 1;
+      try {
+        const parsed = JSON.parse(currentReg.name);
+        if (Array.isArray(parsed)) {
+          participantCount = parsed.length;
         }
+      } catch (e) {}
 
-        const { error: eventError } = await supabase
-          .from('events')
-          .update({ registered: event.registered + participantCount })
-          .eq('id', currentReg.eventId);
-
-        if (eventError) {
-          console.error(`Error incrementing registered count for event ${currentReg.eventId}:`, eventError);
-        }
-      }
+      await safeIncrementEventRegistered(currentReg.eventId, participantCount);
     }
     return true;
   }
@@ -485,27 +506,15 @@ export async function uploadPaymentProof(id: number, base64Image: string, transa
   
   // Tambahkan kuota pendaftar secara otomatis jika ini adalah upload bukti transfer pertama kalinya
   if (isFirstTimeUpload) {
-    const event = await getEventById(currentReg.eventId);
-    if (event) {
-      let participantCount = 1;
-      try {
-        const parsed = JSON.parse(currentReg.name);
-        if (Array.isArray(parsed)) {
-          participantCount = parsed.length;
-        }
-      } catch (e) {
-        // Fallback to 1 if not JSON
+    let participantCount = 1;
+    try {
+      const parsed = JSON.parse(currentReg.name);
+      if (Array.isArray(parsed)) {
+        participantCount = parsed.length;
       }
+    } catch (e) {}
 
-      const { error: eventError } = await supabase
-        .from('events')
-        .update({ registered: event.registered + participantCount })
-        .eq('id', currentReg.eventId);
-
-      if (eventError) {
-        console.error(`Error incrementing registered count for event ${currentReg.eventId}:`, eventError);
-      }
-    }
+    await safeIncrementEventRegistered(currentReg.eventId, participantCount);
   }
 
   return { success: true, message: 'Bukti transfer berhasil dikirim!' };

@@ -77,27 +77,6 @@ const {
         </nav>
 
         <div class="header-actions">
-          <a
-            href="/cek-status"
-            class="nav-link btn-buy-ticket desktop-only"
-            style="margin-right: 0.5rem; background: transparent; border: 1px solid var(--accent); color: white !important;"
-            >Cek Status</a
-          >
-          {
-            isRegistrationOpen ? (
-              <a href="/events/1" class="nav-link btn-buy-ticket desktop-only">
-                Daftar Sekarang
-              </a>
-            ) : (
-              <button
-                class="nav-link btn-buy-ticket desktop-only"
-                style="background-color: #6b7280; color: white; cursor: not-allowed; opacity: 0.8; border: none;"
-                disabled
-              >
-                Dibuka 31 Juli 2026
-              </button>
-            )
-          }
           <button
             class="mobile-menu-btn"
             id="mobile-menu-toggle"

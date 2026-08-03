@@ -21,6 +21,8 @@ if (Astro.request.method === 'POST') {
     // Simple validation
     if (!title || !date || !location || !category || !imageUrl || !description) {
       errorMsg = 'Semua field wajib diisi!';
+    } else if (registered > slots) {
+      errorMsg = 'Jumlah terdaftar (registered) tidak boleh melebihi total kuota slots!';
     } else {
       await createEvent({
         title,
