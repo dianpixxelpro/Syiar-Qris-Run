@@ -4,6 +4,7 @@ import EventCard from "../components/EventCard.astro";
 import CTA from "../components/CTA.astro";
 import RuteComponent from "../components/Rute.astro";
 import { getUpcomingEvents, getFinishedEvents, getEventById } from "../lib/db";
+import { showSelamatCard } from "../config";
 
 const upcomingEvents = await getUpcomingEvents();
 const finishedEvents = await getFinishedEvents();
@@ -90,23 +91,30 @@ const categories = [
         </div>
 
         {isFull ? (
-          <div class="status-alert text-center" style="margin: 2rem 0; padding: 1.75rem 2rem; border-radius: 16px; background: rgba(30, 41, 59, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(59, 130, 246, 0.3); box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
-            <strong style="color: #60a5fa; font-size: 1.35rem; font-weight: 800; display: block; margin-bottom: 0.5rem;">
-              🎉 Selamat untuk para runner yang berhasil terpilih mengikuti event ini!
-            </strong>
-            <p style="color: #cbd5e1; font-size: 0.95rem; line-height: 1.6; max-width: 650px; margin: 0 auto 1rem auto;">
-              Terima kasih atas antusiasme luar biasa dari seluruh peserta! Bagi runner yang belum berkesempatan terdaftar karena kuota telah penuh, tetap semangat dan sampai jumpa di event seru berikutnya.
-            </p>
-
-            <div style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.3); border-left: 4px solid #f59e0b; padding: 0.85rem 1.25rem; border-radius: 8px; text-align: left; margin-top: 1rem;">
-              <strong style="color: #fbbf24; display: block; font-size: 0.9rem; margin-bottom: 0.25rem;">
-                ⚠️ PENTING UNTUK PESERTA TERDAFTAR:
+          showSelamatCard ? (
+            <div class="status-alert text-center" style="margin: 2rem 0; padding: 1.75rem 2rem; border-radius: 16px; background: rgba(30, 41, 59, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(59, 130, 246, 0.3); box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+              <strong style="color: #60a5fa; font-size: 1.35rem; font-weight: 800; display: block; margin-bottom: 0.5rem;">
+                🎉 Selamat untuk para runner yang berhasil terpilih mengikuti event ini!
               </strong>
-              <span style="color: #e2e8f0; font-size: 0.85rem; line-height: 1.5; display: block;">
-                Mohon untuk mengecek folder <strong>Spam / Junk / Promosi</strong> pada email Anda jika E-Tiket atau konfirmasi tidak ditemukan di halaman <strong>Kotak Masuk (Inbox)</strong>.
-              </span>
+              <p style="color: #cbd5e1; font-size: 0.95rem; line-height: 1.6; max-width: 650px; margin: 0 auto 1rem auto;">
+                Terima kasih atas antusiasme luar biasa dari seluruh peserta! Bagi runner yang belum berkesempatan terdaftar karena kuota telah penuh, tetap semangat dan sampai jumpa di event seru berikutnya.
+              </p>
+
+              <div style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.3); border-left: 4px solid #f59e0b; padding: 0.85rem 1.25rem; border-radius: 8px; text-align: left; margin-top: 1rem;">
+                <strong style="color: #fbbf24; display: block; font-size: 0.9rem; margin-bottom: 0.25rem;">
+                  ⚠️ PENTING UNTUK PESERTA TERDAFTAR:
+                </strong>
+                <span style="color: #e2e8f0; font-size: 0.85rem; line-height: 1.5; display: block;">
+                  Mohon untuk mengecek folder <strong>Spam / Junk / Promosi</strong> pada email Anda jika E-Tiket atau konfirmasi tidak ditemukan di halaman <strong>Kotak Masuk (Inbox)</strong>.
+                </span>
+              </div>
             </div>
-          </div>
+          ) : (
+            <button
+              class="btn btn-large"
+              style="margin-top: 2rem; margin-bottom: 2rem; background-color: #6b7280; color: white; cursor: not-allowed; opacity: 0.8;"
+              disabled>Kuota Penuh</button>
+          )
         ) : isRegistrationOpen ? (
           <a
             href="/events/1"
