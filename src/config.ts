@@ -7,4 +7,4 @@
  * - true  : (Event/Project Selesai) Card selamat DITAMPILKAN di beranda.
  *           Halaman & Link "Cek Status" DI-HIDDEN (redirect ke beranda) karena seluruh proses sudah selesai.
  */
-export const showSelamatCard = false;
+export const showSelamatCard = true;
