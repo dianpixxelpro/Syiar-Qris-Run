@@ -179,6 +179,34 @@ a {
   transform: translateY(-1px);
 }
 
+.btn-success {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(5, 150, 105, 0.3);
+}
+.btn-success:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(5, 150, 105, 0.45);
+}
+
+.btn-approve {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 20px rgba(22, 163, 74, 0.4);
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.btn-approve:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(22, 163, 74, 0.55);
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+}
+.btn-approve:active {
+  transform: translateY(0);
+}
+
 /* Card design */
 .card {
   border-radius: var(--radius-md);

@@ -124,6 +124,22 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
               <div id="camera-confirm-viewport-container" class="camera-viewport-wrapper hidden mt-3">
                 <div id="reader-confirm"></div>
               </div>
+
+              <!-- Divider -->
+              <div style="display:flex; align-items:center; gap:0.75rem; margin:1rem 0;">
+                <div style="flex:1; height:1px; background:rgba(255,255,255,0.15);"></div>
+                <span style="font-size:0.75rem; color:#94a3b8; font-weight:600; letter-spacing:0.05em;">ATAU</span>
+                <div style="flex:1; height:1px; background:rgba(255,255,255,0.15);"></div>
+              </div>
+
+              <!-- Manual Approve Button -->
+              <button id="manual-approve-btn" class="btn btn-approve btn-full btn-lg">
+                <span class="btn-text">✅ Approve Check-In Manual</span>
+                <span class="btn-spinner hidden">⌛ Memproses...</span>
+              </button>
+              <p style="font-size:0.75rem; color:#94a3b8; margin-top:0.5rem; text-align:center;">
+                Gunakan jika peserta tidak memiliki QR Code / E-Tiket
+              </p>
             </div>
 
             <!-- Box jika SUDAH CHECK-IN -->
@@ -204,6 +220,9 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
     const startConfirmScanBtn = document.getElementById('start-confirm-scan-btn')!;
     const stopConfirmScanBtn = document.getElementById('stop-confirm-scan-btn')!;
     const cameraConfirmViewportContainer = document.getElementById('camera-confirm-viewport-container')!;
+
+    // Manual Approve Button
+    const manualApproveBtn = document.getElementById('manual-approve-btn') as HTMLButtonElement;
 
     // --- FUNCTION: Lookup Registration Data ---
     async function fetchRegistrationData(query: string) {
@@ -400,6 +419,25 @@ import AdminLayout from "../../../layouts/AdminLayout.astro";
 
     resetLookupBtn.addEventListener('click', () => {
       resetToLookupView();
+    });
+
+    // --- MANUAL APPROVE (tanpa scan QR) ---
+    manualApproveBtn.addEventListener('click', async () => {
+      if (!currentLoadedRegId) return;
+
+      const confirmed = window.confirm(
+        `Approve Check-In Manual untuk #REG-${currentLoadedRegId}?\n\nPastikan identitas peserta sudah diverifikasi secara manual.`
+      );
+      if (!confirmed) return;
+
+      setLoading(manualApproveBtn, true);
+      await executeCheckIn(currentLoadedRegId);
+      setLoading(manualApproveBtn, false);
+
+      // Sembunyikan tombol approve setelah berhasil
+      if (badgeCheckin.textContent === 'SUDAH CHECK-IN') {
+        manualApproveBtn.classList.add('hidden');
+      }
     });
 
     // --- LOOKUP SCANNER LOGIC ---
