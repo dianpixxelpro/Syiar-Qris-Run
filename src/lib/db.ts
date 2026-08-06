@@ -30,6 +30,24 @@ export interface Registration {
   createdAt: string;
 }
 
+export interface RefundSubmission {
+  id?: number;
+  registrationId?: number;
+  token: string;
+  refundCode: string;
+  participantName: string;
+  participantPhone: string;
+  senderName: string;
+  transactionDate: string;
+  rrnNumber: string;
+  proofImage: string;
+  accountName: string;
+  accountNumber: string;
+  bankName: string;
+  status: string;
+  createdAt?: string;
+}
+
 // Helpers to map DB models to TS Interfaces
 function mapEvent(dbEvent: any): Event {
   return {
@@ -613,4 +631,98 @@ export async function findRegistrationForUpload(
   }
   
   return undefined;
+}
+
+function mapRefund(dbRefund: any): RefundSubmission {
+  return {
+    id: dbRefund.id,
+    registrationId: dbRefund.registration_id,
+    token: dbRefund.token,
+    refundCode: dbRefund.refund_code,
+    participantName: dbRefund.participant_name,
+    participantPhone: dbRefund.participant_phone,
+    senderName: dbRefund.sender_name,
+    transactionDate: dbRefund.transaction_date,
+    rrnNumber: dbRefund.rrn_number,
+    proofImage: dbRefund.proof_image,
+    accountName: dbRefund.account_name,
+    accountNumber: dbRefund.account_number,
+    bankName: dbRefund.bank_name,
+    status: dbRefund.status,
+    createdAt: dbRefund.created_at,
+  };
+}
+
+export async function getRefundByToken(token: string): Promise<RefundSubmission | null> {
+  const { data, error } = await supabase
+    .from('refunds')
+    .select('*')
+    .eq('token', token)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code !== 'PGRST116') {
+      console.error(`Error fetching refund for token ${token}:`, error);
+    }
+    return null;
+  }
+  return data ? mapRefund(data) : null;
+}
+
+export async function getRefundByRegistrationId(regId: number): Promise<RefundSubmission | null> {
+  const { data, error } = await supabase
+    .from('refunds')
+    .select('*')
+    .eq('registration_id', regId)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code !== 'PGRST116') {
+      console.error(`Error fetching refund for registration_id ${regId}:`, error);
+    }
+    return null;
+  }
+  return data ? mapRefund(data) : null;
+}
+
+export async function submitRefundRequest(data: RefundSubmission): Promise<{ success: boolean; message: string; refundCode?: string }> {
+  const existing = await getRefundByToken(data.token);
+  if (existing) {
+    return {
+      success: false,
+      message: `Pengajuan refund untuk token ini sudah dikirim sebelumnya (Kode: ${existing.refundCode}, Status: ${existing.status}).`,
+      refundCode: existing.refundCode,
+    };
+  }
+
+  const { data: inserted, error } = await supabase
+    .from('refunds')
+    .insert({
+      registration_id: data.registrationId || null,
+      token: data.token,
+      refund_code: data.refundCode,
+      participant_name: data.participantName,
+      participant_phone: data.participantPhone,
+      sender_name: data.senderName,
+      transaction_date: data.transactionDate,
+      rrn_number: data.rrnNumber,
+      proof_image: data.proofImage,
+      account_name: data.accountName,
+      account_number: data.accountNumber,
+      bank_name: data.bankName,
+      status: data.status || 'Menunggu Verifikasi',
+    })
+    .select('*')
+    .single();
+
+  if (error) {
+    console.error('Error inserting refund request into Supabase:', error);
+    return { success: false, message: 'Gagal menyimpan pengajuan refund ke database. Pastikan tabel refunds telah dibuat.' };
+  }
+
+  return {
+    success: true,
+    message: 'Pengajuan refund berhasil dikirim.',
+    refundCode: inserted ? inserted.refund_code : data.refundCode,
+  };
 }

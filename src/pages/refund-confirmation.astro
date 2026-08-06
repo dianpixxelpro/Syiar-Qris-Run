@@ -1,0 +1,1099 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { decryptId, decryptText } from "../lib/crypto";
+import {
+  getRegistrationById,
+  getRefundByToken,
+  submitRefundRequest,
+  type RefundSubmission,
+} from "../lib/db";
+
+let token = Astro.url.searchParams.get("token") || "";
+let errorMsg = "";
+let warningMsg = "";
+let participantName = "";
+let participantPhone = "";
+let isLocked = false;
+let registrationId: number | undefined = undefined;
+let existingRefund: RefundSubmission | null = null;
+let isSubmittedSuccess = false;
+let successData: {
+  refundCode: string;
+  accountName: string;
+  accountNumber: string;
+  bankName: string;
+  participantName: string;
+  waUrl: string;
+} | null = null;
+
+const adminWaPhone =
+  import.meta.env.PUBLIC_ADMIN_REFUND_WA ||
+  process.env.PUBLIC_ADMIN_REFUND_WA ||
+  "628815083790";
+
+// 1. Validasi Token & Pengisian Data Peserta
+if (token) {
+  existingRefund = await getRefundByToken(token);
+
+  if (existingRefund) {
+    participantName = existingRefund.participantName;
+    participantPhone = existingRefund.participantPhone;
+    isLocked = true;
+    warningMsg = `Pengajuan refund untuk data ini sudah pernah dikirim sebelumnya dengan Kode Pengajuan: ${existingRefund.refundCode} (Status: ${existingRefund.status}).`;
+  } else {
+    // Coba dekripsi token (bisa berupa teks "Nama|NoWA" atau ID integer)
+    const decryptedText = decryptText(token);
+
+    if (decryptedText && decryptedText.includes("|")) {
+      // Format payload dari token luar: Nama|NoWA
+      const parts = decryptedText.split("|");
+      participantName = parts[0] || "";
+      participantPhone = parts[1] || "";
+      isLocked = true;
+    } else {
+      // Coba sebagai ID registrasi dari database Supabase
+      const decryptedId = decryptId(token);
+      if (decryptedId) {
+        registrationId = decryptedId;
+        const reg = await getRegistrationById(decryptedId);
+        if (reg) {
+          try {
+            const parsed = JSON.parse(reg.name);
+            if (Array.isArray(parsed)) {
+              participantName = parsed
+                .map((p: any) => p.name || p)
+                .filter(Boolean)
+                .join(", ");
+            } else {
+              participantName = reg.name;
+            }
+          } catch (e) {
+            participantName = reg.name;
+          }
+          participantPhone = reg.phone;
+          isLocked = true;
+        }
+      }
+    }
+  }
+}
+
+// 2. Handling Form Submission (POST)
+if (Astro.request.method === "POST" && !errorMsg && !existingRefund) {
+  try {
+    const formData = await Astro.request.formData();
+    const inputParticipantName = ((formData.get("participantName") as string) || "").trim();
+    const inputParticipantPhone = ((formData.get("participantPhone") as string) || "").trim();
+    const finalParticipantName = isLocked ? participantName : inputParticipantName;
+    const finalParticipantPhone = isLocked ? participantPhone : inputParticipantPhone;
+
+    const senderName = ((formData.get("senderName") as string) || "").trim();
+    const transactionDate = (
+      (formData.get("transactionDate") as string) || ""
+    ).trim();
+    const transactionTime = (
+      (formData.get("transactionTime") as string) || ""
+    ).trim();
+    const rrnNumber = ((formData.get("rrnNumber") as string) || "").trim();
+    const accountName = ((formData.get("accountName") as string) || "").trim();
+    const accountNumber = (
+      (formData.get("accountNumber") as string) || ""
+    ).trim();
+    const bankName = ((formData.get("bankName") as string) || "").trim();
+    const agreed = formData.get("agreed");
+    const proofFile = formData.get("proofFile") as File | null;
+
+    const fullTransactionDateTime = transactionTime
+      ? `${transactionDate} ${transactionTime}`
+      : transactionDate;
+
+    if (
+      !finalParticipantName ||
+      !finalParticipantPhone ||
+      !senderName ||
+      !transactionDate ||
+      !transactionTime ||
+      !rrnNumber ||
+      !accountName ||
+      !accountNumber ||
+      !bankName
+    ) {
+      errorMsg = "Mohon lengkapi seluruh formulir data pengajuan.";
+    } else if (!agreed) {
+      errorMsg = "Anda harus menyetujui pernyataan kebenaran data.";
+    } else if (!proofFile || proofFile.size === 0) {
+      errorMsg = "Mohon unggah bukti transfer atau tangkapan layar transaksi.";
+    } else if (proofFile.size > 5 * 1024 * 1024) {
+      errorMsg = "Ukuran berkas bukti transfer terlalu besar. Maksimal 5MB.";
+    } else {
+      const allowedMimeTypes = [
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/jpg",
+        "application/pdf",
+      ];
+      if (!allowedMimeTypes.includes(proofFile.type.toLowerCase())) {
+        errorMsg =
+          "Format berkas tidak didukung. Mohon unggah gambar (JPG, PNG, WEBP) atau PDF.";
+      } else {
+        // Prosess file to Base64
+        const buffer = Buffer.from(await proofFile.arrayBuffer());
+        const base64Image = `data:${proofFile.type};base64,${buffer.toString("base64")}`;
+
+        // Generate unique refund code
+        const randomCode = Math.random()
+          .toString(36)
+          .substring(2, 7)
+          .toUpperCase();
+        const refundCode = `RFND-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, "0")}-${randomCode}`;
+        const finalToken = token || `manual_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+        const refundPayload: RefundSubmission = {
+          registrationId,
+          token: finalToken,
+          refundCode,
+          participantName: finalParticipantName,
+          participantPhone: finalParticipantPhone,
+          senderName,
+          transactionDate: fullTransactionDateTime,
+          rrnNumber,
+          proofImage: base64Image,
+          accountName,
+          accountNumber,
+          bankName,
+          status: "Menunggu Verifikasi",
+        };
+
+        const result = await submitRefundRequest(refundPayload);
+        if (result.success) {
+          isSubmittedSuccess = true;
+          const finalRefundCode = result.refundCode || refundCode;
+
+          // Encode pesan WhatsApp sesuai spesifikasi
+          const waMessageText = `Halo Admin Syiar QRIS Run 2026, saya ${finalParticipantName} ingin mengonfirmasi pengajuan refund dengan data berikut:
+
+Nama pemilik rekening: ${accountName}
+Nomor rekening: ${accountNumber}
+Nama bank: ${bankName}
+Kode pengajuan: ${finalRefundCode}
+
+Data dan bukti transaksi telah saya kirimkan melalui formulir refund. Mohon dilakukan verifikasi. Terima kasih.`;
+
+          const waUrl = `https://wa.me/${adminWaPhone}?text=${encodeURIComponent(waMessageText)}`;
+
+          successData = {
+            refundCode: finalRefundCode,
+            accountName,
+            accountNumber,
+            bankName,
+            participantName: finalParticipantName,
+            waUrl,
+          };
+        } else {
+          errorMsg = result.message;
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Error handling refund submission:", err);
+    errorMsg =
+      "Terjadi kesalahan saat menyimpan pengajuan refund. Silakan coba lagi.";
+  }
+}
+
+// Data WhatsApp jika sudah pernah mengajukan sebelumnya (untuk tombol WA manual)
+let existingWaUrl = "";
+if (existingRefund) {
+  const waMsg = `Halo Admin Syiar QRIS Run 2026, saya ${existingRefund.participantName} ingin mengonfirmasi pengajuan refund dengan data berikut:
+
+Nama pemilik rekening: ${existingRefund.accountName}
+Nomor rekening: ${existingRefund.accountNumber}
+Nama bank: ${existingRefund.bankName}
+Kode pengajuan: ${existingRefund.refundCode}
+
+Data dan bukti transaksi telah saya kirimkan melalui formulir refund. Mohon dilakukan verifikasi. Terima kasih.`;
+  existingWaUrl = `https://wa.me/${adminWaPhone}?text=${encodeURIComponent(waMsg)}`;
+}
+---
+
+<Layout title="Form Pengajuan Refund — Syiar QRIS Run 2026">
+  <section class="refund-section">
+    <div class="refund-container">
+      {/* Header Halaman */}
+      <div class="refund-header">
+        <h1 class="refund-title">Form Pengajuan Refund</h1>
+        <div class="subtitle-wrapper">
+          <span class="line"></span>
+          <span class="subtitle-text">Syiar QRIS Run 2026</span>
+          <span class="line"></span>
+        </div>
+      </div>
+
+      {/* State 1: Sukses Mengirim */}
+      {
+        isSubmittedSuccess && successData ? (
+          <div class="refund-card success-card glass">
+            <div class="success-badge-icon">✓</div>
+            <h2 class="success-title">Pengajuan Refund Berhasil Dikirim!</h2>
+            <p class="success-desc">
+              Data dan bukti transaksi Anda telah tersimpan dengan status{" "}
+              <strong class="badge-pending">Menunggu Verifikasi</strong>.
+            </p>
+
+            <div class="refund-code-box">
+              <span class="code-label">KODE PENGAJUAN REFUND</span>
+              <div class="code-value">{successData.refundCode}</div>
+            </div>
+
+            <div class="summary-box">
+              <div class="summary-row">
+                <span>Nama Pemilik Rekening:</span>
+                <strong>{successData.accountName}</strong>
+              </div>
+              <div class="summary-row">
+                <span>Nomor Rekening:</span>
+                <strong>{successData.accountNumber}</strong>
+              </div>
+              <div class="summary-row">
+                <span>Nama Bank:</span>
+                <strong>{successData.bankName}</strong>
+              </div>
+            </div>
+
+            <div class="action-box">
+              <p class="redirect-info">
+                Mengalihkan secara otomatis ke WhatsApp Admin...
+              </p>
+              <a
+                href={successData.waUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="btn-wa"
+              >
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                </svg>
+                Konfirmasi ke WhatsApp Admin
+              </a>
+            </div>
+          </div>
+        ) : (
+          /* State 2: Form Utama */
+          <div class="refund-card glass">
+            {/* Info Banner Biru Top */}
+            <div class="info-alert-blue">
+              <span class="info-icon">ℹ️</span>
+              <span>
+                Silakan lengkapi data berikut untuk proses verifikasi dan
+                pengembalian dana.
+              </span>
+            </div>
+
+            {/* Pesan Error / Warning jika ada */}
+            {errorMsg && <div class="alert-error">⚠️ {errorMsg}</div>}
+
+            {warningMsg && existingRefund && (
+              <div class="alert-warning">
+                <p>⚠️ {warningMsg}</p>
+                {existingWaUrl && (
+                  <a
+                    href={existingWaUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="btn-wa-sm"
+                    style="margin-top: 0.8rem; display: inline-flex;"
+                  >
+                    Konfirmasi ke WhatsApp Admin
+                  </a>
+                )}
+              </div>
+            )}
+
+            {!errorMsg && (
+              <form
+                method="POST"
+                enctype="multipart/form-data"
+                class="refund-form"
+              >
+                {/* Field Peserta */}
+                <div class="form-group">
+                  <label for="participantName">Nama Peserta</label>
+                  <input
+                    type="text"
+                    id="participantName"
+                    name="participantName"
+                    value={participantName}
+                    readonly={isLocked}
+                    disabled={isLocked || Boolean(existingRefund)}
+                    required
+                    placeholder="Masukkan Nama Lengkap Peserta"
+                    class={isLocked ? "input-disabled" : ""}
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label for="participantPhone">Nomor WhatsApp</label>
+                  <input
+                    type="text"
+                    id="participantPhone"
+                    name="participantPhone"
+                    value={participantPhone}
+                    readonly={isLocked}
+                    disabled={isLocked || Boolean(existingRefund)}
+                    required
+                    placeholder="Contoh: 081234567890"
+                    class={isLocked ? "input-disabled" : ""}
+                  />
+                </div>
+
+                {/* Section 1: Informasi Transaksi */}
+                <div class="section-divider">
+                  <div class="section-title">
+                    <span class="icon">📄</span>
+                    <h2>Informasi Transaksi</h2>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="senderName">Nama Pengirim</label>
+                  <input
+                    type="text"
+                    id="senderName"
+                    name="senderName"
+                    required
+                    placeholder="Contoh: Andi Pratama"
+                    disabled={Boolean(existingRefund)}
+                  />
+                </div>
+
+                <div class="form-row-2">
+                  <div class="form-group">
+                    <label for="transactionDate">Tanggal Transaksi</label>
+                    <input
+                      type="date"
+                      id="transactionDate"
+                      name="transactionDate"
+                      required
+                      disabled={Boolean(existingRefund)}
+                    />
+                  </div>
+
+                  <div class="form-group">
+                    <label for="transactionTime">
+                      Waktu Transaksi (Jam & Menit)
+                    </label>
+                    <input
+                      type="time"
+                      id="transactionTime"
+                      name="transactionTime"
+                      required
+                      disabled={Boolean(existingRefund)}
+                    />
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="rrnNumber">Nomor Referensi / RRN</label>
+                  <input
+                    type="text"
+                    id="rrnNumber"
+                    name="rrnNumber"
+                    required
+                    placeholder="Contoh: 620260802123456"
+                    disabled={Boolean(existingRefund)}
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label for="proofFile">Upload Bukti Transaksi</label>
+                  <div class="file-upload-box" id="fileDropZone">
+                    <input
+                      type="file"
+                      id="proofFile"
+                      name="proofFile"
+                      accept=".jpg,.jpeg,.png,.webp,.pdf"
+                      required
+                      disabled={Boolean(existingRefund)}
+                      class="file-input-hidden"
+                    />
+                    <div class="file-preview-content" id="filePreviewDefault">
+                      <span class="upload-icon">📁</span>
+                      <p>Klik atau seret file bukti transfer ke sini</p>
+                      <span class="upload-hint">
+                        Format: JPG, PNG, WEBP, PDF (Maks. 5MB)
+                      </span>
+                    </div>
+                    <div
+                      class="file-preview-selected"
+                      id="filePreviewSelected"
+                      style="display: none;"
+                    >
+                      <span class="doc-icon">📄</span>
+                      <div class="file-info-text">
+                        <strong id="fileNameText">bukti-transfer.jpg</strong>
+                        <span id="fileSizeText">104 KB • JPG</span>
+                      </div>
+                      <span class="check-icon">✓</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 2: Rekening Tujuan Refund */}
+                <div class="section-divider">
+                  <div class="section-title">
+                    <span class="icon">🏛️</span>
+                    <h2>Rekening Tujuan Refund</h2>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="accountName">Nama Pemilik Rekening</label>
+                  <input
+                    type="text"
+                    id="accountName"
+                    name="accountName"
+                    required
+                    placeholder="Contoh: Andi Pratama"
+                    disabled={Boolean(existingRefund)}
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label for="accountNumber">Nomor Rekening</label>
+                  <input
+                    type="text"
+                    id="accountNumber"
+                    name="accountNumber"
+                    required
+                    placeholder="Contoh: 1234567890"
+                    disabled={Boolean(existingRefund)}
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label for="bankName">Nama Bank</label>
+                  <select
+                    id="bankName"
+                    name="bankName"
+                    required
+                    disabled={Boolean(existingRefund)}
+                  >
+                    <option value="">-- Pilih Bank --</option>
+                    <option value="BCA">BCA (Bank Central Asia)</option>
+                    <option value="Mandiri">Bank Mandiri</option>
+                    <option value="BRI">BRI (Bank Rakyat Indonesia)</option>
+                    <option value="BNI">BNI (Bank Negara Indonesia)</option>
+                    <option value="BSI">BSI (Bank Syariah Indonesia)</option>
+                    <option value="Bank Jatim">Bank Jatim</option>
+                    <option value="CIMB Niaga">CIMB Niaga</option>
+                    <option value="Permata">Bank Permata</option>
+                    <option value="Danamon">Bank Danamon</option>
+                    <option value="Lainnya">Bank Lainnya</option>
+                  </select>
+                </div>
+
+                {/* Checkbox Konfirmasi */}
+                <div class="checkbox-group">
+                  <input
+                    type="checkbox"
+                    id="agreed"
+                    name="agreed"
+                    required
+                    disabled={Boolean(existingRefund)}
+                  />
+                  <label for="agreed">
+                    Saya menyatakan data yang diisi sudah benar.
+                  </label>
+                </div>
+
+                {/* Tombol Submit */}
+                <button
+                  type="submit"
+                  class="btn-submit"
+                  disabled={Boolean(existingRefund)}
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M22 2L11 13" />
+                    <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+                  </svg>
+                  Kirim Pengajuan Refund
+                </button>
+
+                {/* Alert Keamanan (Shield Amber) */}
+                <div class="alert-shield-amber">
+                  <span class="shield-icon">🛡️</span>
+                  <span>
+                    Panitia tidak pernah meminta PIN, OTP, CVV, password,
+                    ataupun biaya tambahan.
+                  </span>
+                </div>
+
+                {/* Alert WhatsApp Redirect (Blue) */}
+                <div class="alert-wa-blue">
+                  <span class="wa-icon-sm">💬</span>
+                  <span>
+                    Setelah formulir dikirim, peserta akan diarahkan ke{" "}
+                    <strong>WhatsApp Admin Syiar QRIS Run 2026</strong> untuk
+                    konfirmasi.
+                  </span>
+                </div>
+              </form>
+            )}
+          </div>
+        )
+      }
+    </div>
+  </section>
+</Layout>
+
+<script
+  is:inline
+  define:vars={{ isSubmittedSuccess, waUrl: successData?.waUrl || "" }}
+>
+  // Automatic file preview handler
+  const fileInput = document.getElementById("proofFile");
+  const previewDefault = document.getElementById("filePreviewDefault");
+  const previewSelected = document.getElementById("filePreviewSelected");
+  const fileNameText = document.getElementById("fileNameText");
+  const fileSizeText = document.getElementById("fileSizeText");
+
+  if (fileInput) {
+    fileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        fileNameText.textContent = file.name;
+        const sizeKb = Math.round(file.size / 1024);
+        const ext = file.name.split(".").pop().toUpperCase();
+        fileSizeText.textContent = `${sizeKb} KB • ${ext}`;
+        previewDefault.style.display = "none";
+        previewSelected.style.display = "flex";
+      } else {
+        previewDefault.style.display = "flex";
+        previewSelected.style.display = "none";
+      }
+    });
+  }
+
+  // Automatic redirect to WhatsApp on success after 1.5 seconds
+  if (isSubmittedSuccess && waUrl) {
+    setTimeout(() => {
+      window.location.href = waUrl;
+    }, 1500);
+  }
+</script>
+
+<style>
+  .refund-section {
+    background-color: #f8fafc;
+    min-height: 100vh;
+    padding: 120px 1.25rem 80px 1.25rem;
+  }
+
+  .refund-container {
+    max-width: 580px;
+    margin: 0 auto;
+  }
+
+  .refund-header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .refund-title {
+    font-size: 2.25rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.02em;
+  }
+
+  .subtitle-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+  }
+
+  .subtitle-wrapper .line {
+    height: 1px;
+    width: 60px;
+    background: #cbd5e1;
+  }
+
+  .subtitle-text {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #d97706; /* Warm amber/gold theme */
+    letter-spacing: 0.5px;
+  }
+
+  .refund-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08);
+  }
+
+  /* Info Banners */
+  .info-alert-blue {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.8rem;
+    background-color: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1e40af;
+    border-radius: 10px;
+    padding: 0.9rem 1.1rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    line-height: 1.5;
+    margin-bottom: 1.75rem;
+  }
+
+  .info-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+  }
+
+  .alert-error {
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #dc2626;
+    padding: 1rem;
+    border-radius: 10px;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+  }
+
+  .alert-warning {
+    background-color: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #b45309;
+    padding: 1rem;
+    border-radius: 10px;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+  }
+
+  /* Form Elements */
+  .refund-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .form-group label {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #334155;
+  }
+
+  .form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .form-group input[type="text"],
+  .form-group input[type="date"],
+  .form-group input[type="time"],
+  .form-group select {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.98rem;
+    color: #0f172a;
+    background-color: #ffffff;
+    transition: all 0.2s ease;
+    outline: none;
+  }
+
+  .form-group input:focus,
+  .form-group select:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  }
+
+  .input-disabled {
+    background-color: #f1f5f9 !important;
+    color: #475569 !important;
+    cursor: not-allowed;
+    border-color: #e2e8f0 !important;
+  }
+
+  /* Section Dividers */
+  .section-divider {
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 1.5px solid #2563eb;
+    padding-bottom: 0.4rem;
+  }
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .section-title .icon {
+    font-size: 1.2rem;
+  }
+
+  .section-title h2 {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #1e3a8a;
+    margin: 0;
+  }
+
+  /* File Upload Box */
+  .file-upload-box {
+    position: relative;
+    border: 2px dashed #cbd5e1;
+    border-radius: 10px;
+    padding: 1.2rem;
+    background-color: #f8fafc;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .file-upload-box:hover {
+    border-color: #2563eb;
+    background-color: #eff6ff;
+  }
+
+  .file-input-hidden {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .file-preview-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    text-align: center;
+    color: #64748b;
+  }
+
+  .upload-icon {
+    font-size: 2rem;
+  }
+
+  .file-preview-content p {
+    font-weight: 600;
+    font-size: 0.92rem;
+    margin: 0;
+    color: #334155;
+  }
+
+  .upload-hint {
+    font-size: 0.8rem;
+    color: #94a3b8;
+  }
+
+  .file-preview-selected {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+  }
+
+  .doc-icon {
+    font-size: 1.5rem;
+  }
+
+  .file-info-text {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+  }
+
+  .file-info-text strong {
+    font-size: 0.95rem;
+    color: #0f172a;
+    word-break: break-all;
+  }
+
+  .file-info-text span {
+    font-size: 0.8rem;
+    color: #64748b;
+  }
+
+  .check-icon {
+    width: 26px;
+    height: 26px;
+    background-color: #16a34a;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+  }
+
+  /* Checkbox Group */
+  .checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-top: 0.5rem;
+  }
+
+  .checkbox-group input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #2563eb;
+    cursor: pointer;
+  }
+
+  .checkbox-group label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #334155;
+    cursor: pointer;
+  }
+
+  /* Submit Button */
+  .btn-submit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    background-color: #2563eb;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1.05rem;
+    padding: 0.9rem 1.5rem;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    margin-top: 0.5rem;
+  }
+
+  .btn-submit:hover:not(:disabled) {
+    background-color: #1d4ed8;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+  }
+
+  .btn-submit:disabled {
+    background-color: #94a3b8;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  /* Amber Shield Alert */
+  .alert-shield-amber {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    background-color: #fffbeb;
+    border: 1px solid #fef3c7;
+    color: #92400e;
+    border-radius: 10px;
+    padding: 0.85rem 1.1rem;
+    font-size: 0.88rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
+  }
+
+  .shield-icon {
+    font-size: 1.3rem;
+    flex-shrink: 0;
+  }
+
+  /* Blue WA Alert */
+  .alert-wa-blue {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.8rem;
+    background-color: #eff6ff;
+    border: 1px solid #dbeafe;
+    color: #1e40af;
+    border-radius: 10px;
+    padding: 0.85rem 1.1rem;
+    font-size: 0.88rem;
+    line-height: 1.5;
+  }
+
+  .wa-icon-sm {
+    font-size: 1.3rem;
+    flex-shrink: 0;
+  }
+
+  /* Success Card Layout */
+  .success-card {
+    text-align: center;
+    padding: 3rem 2rem;
+  }
+
+  .success-badge-icon {
+    width: 64px;
+    height: 64px;
+    background-color: #16a34a;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: bold;
+    margin: 0 auto 1.5rem auto;
+    box-shadow: 0 8px 20px rgba(22, 163, 74, 0.3);
+  }
+
+  .success-title {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 0.5rem;
+  }
+
+  .success-desc {
+    font-size: 1rem;
+    color: #475569;
+    margin-bottom: 1.5rem;
+  }
+
+  .badge-pending {
+    color: #d97706;
+    background: #fffbeb;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    border: 1px solid #fef3c7;
+  }
+
+  .refund-code-box {
+    background-color: #f8fafc;
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1.75rem;
+  }
+
+  .code-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #64748b;
+    letter-spacing: 1px;
+  }
+
+  .code-value {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: #1e3a8a;
+    letter-spacing: 2px;
+    margin-top: 0.25rem;
+  }
+
+  .summary-box {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    text-align: left;
+    margin-bottom: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.95rem;
+    color: #334155;
+  }
+
+  .btn-wa {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    background-color: #25d366;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1.05rem;
+    padding: 0.9rem 1.5rem;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 14px rgba(37, 211, 102, 0.3);
+    width: 100%;
+  }
+
+  .btn-wa:hover {
+    background-color: #1eb956;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(37, 211, 102, 0.4);
+  }
+
+  .btn-wa-sm {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background-color: #25d366;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.88rem;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    text-decoration: none;
+  }
+
+  .redirect-info {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin-bottom: 0.75rem;
+  }
+
+  @media (max-width: 640px) {
+    .refund-section {
+      padding-top: 100px;
+      padding-bottom: 40px;
+    }
+    .refund-card {
+      padding: 1.5rem 1.2rem;
+    }
+    .refund-title {
+      font-size: 1.8rem;
+    }
+    .form-row-2 {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

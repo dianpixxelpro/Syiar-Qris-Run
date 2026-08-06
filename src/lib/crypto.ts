@@ -22,20 +22,25 @@ export function encryptId(id: number): string {
   }
 }
 
-/**
- * Mendekripsi string hex dari URL kembali menjadi ID integer
- */
-export function decryptId(hash: string): number | null {
+export function encryptText(text: string): string {
   try {
-    // Jika masih berupa angka (legacy support, opsional jika ingin memblokir akses IDOR hapus ini)
-    // if (/^\d+$/.test(hash)) return parseInt(hash, 10);
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY), iv);
+    let encrypted = cipher.update(text, 'utf8');
+    encrypted = Buffer.concat([encrypted, cipher.final()]);
+    return iv.toString('hex') + '-' + encrypted.toString('hex');
+  } catch (error) {
+    console.error('Error encrypting text:', error);
+    return Buffer.from(`fallback_${text}`).toString('base64').replace(/=/g, '');
+  }
+}
 
-    // Cek fallback
+export function decryptText(hash: string): string | null {
+  try {
     if (!hash.includes('-')) {
       const decoded = Buffer.from(hash, 'base64').toString('utf8');
       if (decoded.startsWith('fallback_')) {
-        const id = parseInt(decoded.split('_')[1], 10);
-        return isNaN(id) ? null : id;
+        return decoded.slice(9);
       }
       return null;
     }
@@ -50,7 +55,20 @@ export function decryptId(hash: string): number | null {
     let decrypted = decipher.update(encryptedText);
     decrypted = Buffer.concat([decrypted, decipher.final()]);
     
-    const id = parseInt(decrypted.toString(), 10);
+    return decrypted.toString('utf8');
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Mendekripsi string hex dari URL kembali menjadi ID integer
+ */
+export function decryptId(hash: string): number | null {
+  try {
+    const text = decryptText(hash);
+    if (!text) return null;
+    const id = parseInt(text, 10);
     return isNaN(id) ? null : id;
   } catch (error) {
     return null; // Return null jika format tidak valid atau diubah manual
