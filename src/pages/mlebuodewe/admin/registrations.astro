@@ -432,24 +432,6 @@ const allEvents = await getAllEvents();
 
             <button
               type="button"
-              id="btn-open-generator"
-              class="btn btn-outline btn-small"
-              style="padding: 0.5rem 0.9rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem; background: rgba(59,130,246,0.15); color: #60a5fa; border-color: rgba(59,130,246,0.3);"
-            >
-              <span>🔗</span> Generator Link Refund
-            </button>
-
-            <button
-              type="button"
-              id="btn-copy-wa-template"
-              class="btn btn-outline btn-small"
-              style="padding: 0.5rem 0.9rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem; background: rgba(245,158,11,0.1); color: #f59e0b; border-color: rgba(245,158,11,0.3);"
-            >
-              <span>📋</span> Template WA Kusuma
-            </button>
-
-            <button
-              type="button"
               id="btn-export-csv"
               class="btn btn-outline btn-small export-btn"
               style="padding: 0.5rem 0.9rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem;"
@@ -945,42 +927,6 @@ const allEvents = await getAllEvents();
           </form>
         </div>
       </div>
-
-      <!-- Modal Generator Link Refund Peserta Luar -->
-      <div id="refundGeneratorModal" class="modal-overlay">
-        <div class="modal-content glass" style="max-width: 650px; padding: 2rem;">
-          <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem; margin-bottom: 1.5rem;">
-            <h3 style="margin: 0; font-size: 1.4rem;">🔗 Generator Link Refund (Peserta Luar)</h3>
-            <button class="close-modal" id="closeRefundGeneratorModal" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
-          </div>
-          
-          <p style="color: #94a3b8; font-size: 0.9rem; margin-bottom: 1.5rem;">
-            Gunakan fitur ini untuk membuat link refund terenkripsi khusus bagi peserta yang <strong>tidak terdaftar di database Supabase</strong>.
-          </p>
-
-          <div class="form-group mb-3" style="margin-bottom: 1.2rem;">
-            <label style="display:block; margin-bottom:0.5rem; font-weight: 600;">Nama Peserta</label>
-            <input type="text" id="genSingleName" class="form-control" placeholder="Contoh: Budi Santoso" style="width:100%; padding:0.6rem; background:#1e293b; color:white; border:1px solid #334155; border-radius:6px;" />
-          </div>
-
-          <div class="form-group mb-3" style="margin-bottom: 1.5rem;">
-            <label style="display:block; margin-bottom:0.5rem; font-weight: 600;">Nomor WhatsApp Peserta</label>
-            <input type="text" id="genSinglePhone" class="form-control" placeholder="Contoh: 081234567890" style="width:100%; padding:0.6rem; background:#1e293b; color:white; border:1px solid #334155; border-radius:6px;" />
-          </div>
-
-          <button type="button" id="btnGenSingle" class="btn btn-primary" style="width: 100%; padding: 0.75rem; font-weight: 700; font-size: 0.95rem; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer;">
-            ⚡ Buat Tautan Refund Unik
-          </button>
-
-          <div id="genResultBox" style="display: none; background: rgba(15, 23, 42, 0.8); border: 1px dashed #3b82f6; border-radius: 8px; padding: 1.2rem; margin-top: 1.5rem;">
-            <label style="display:block; font-size: 0.85rem; color: #94a3b8; font-weight: 700; margin-bottom: 0.4rem;">TAUTAN REFUND UNIK BERHASIL DIBUAT:</label>
-            <textarea id="genResultUrl" readonly rows="3" style="width:100%; background: #0f172a; color: #60a5fa; border: 1px solid #334155; border-radius: 6px; padding: 0.6rem; font-family: monospace; font-size: 0.85rem; resize: none; margin-bottom: 0.8rem;"></textarea>
-            <button type="button" id="btnCopyGenResult" class="btn btn-small" style="background: #16a34a; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 700; cursor: pointer;">
-              📋 Salin Tautan Ke Clipboard
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   </section>
 </AdminLayout>
@@ -1056,7 +1002,6 @@ const allEvents = await getAllEvents();
 
     let actionBtn = "";
     const editButton = `<button type="button" class="btn-table btn-edit open-edit-modal-btn" data-id="${reg.id}" data-email="${reg.email}" data-phone="${reg.phone}" data-status="${reg.status}" style="background: rgba(45,130,255,0.15); color: #3b82f6; border: 1px solid rgba(45,130,255,0.4);">✏️ Edit</button>`;
-    const refundButton = `<button type="button" class="btn-table btn-edit copy-refund-btn" data-name="${parseName(reg.name).replace(/"/g, '&quot;')}" data-encrypted="${reg.encryptedId}" style="background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.4);" title="Salin Link Refund WhatsApp">🔄 Link Refund</button>`;
 
     if (reg.status === "PENDING") {
       if (reg.paymentProof) {
@@ -1068,7 +1013,7 @@ const allEvents = await getAllEvents();
       actionBtn = `<span style="font-size:0.85rem; color:#ef4444; font-style:italic; margin-right:0.5rem;">Kadaluarsa</span>`;
     }
 
-    actionBtn += editButton + refundButton;
+    actionBtn += editButton;
 
     if (reg.status !== "PENDING" && reg.status !== "EXPIRED") {
       actionBtn = `<a href="/ticket/${reg.encryptedId}" class="btn-table btn-edit" target="_blank">Lihat Tiket</a>` + actionBtn.replace(editButton, "") + `<form method="POST" onsubmit="return confirm('Kirim ulang email E-Tiket untuk pendaftar ini?');" style="margin:0; display:inline-block; margin-left:0.5rem;"><input type="hidden" name="action" value="resend_email"><input type="hidden" name="id" value="${reg.id}"><button type="submit" class="btn-table btn-edit" style="background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.4);">📧 Kirim Email</button></form>`;
@@ -1143,117 +1088,6 @@ const allEvents = await getAllEvents();
           editStatus.value = status || "PENDING";
           editModal.classList.add("active");
         }
-      });
-    });
-    document.querySelectorAll(".copy-refund-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const encrypted = btn.getAttribute("data-encrypted");
-        const name = btn.getAttribute("data-name");
-        const url = `${window.location.origin}/refund-confirmation?token=${encrypted}`;
-        navigator.clipboard.writeText(url).then(() => {
-          alert(`Link Refund unik untuk ${name} berhasil disalin!\n\nTautan:\n${url}`);
-        }).catch(() => {
-          prompt(`Link Refund unik untuk ${name}:`, url);
-        });
-      });
-    });
-  }
-
-  const btnCopyWaTemplate = document.getElementById("btn-copy-wa-template");
-  if (btnCopyWaTemplate) {
-    btnCopyWaTemplate.addEventListener("click", () => {
-      const templateText = `Halo Kak {{1}},
-
-Terima kasih telah melakukan pendaftaran Syiar QRIS Run 2026.
-
-Berdasarkan hasil verifikasi, pendaftaran Kakak tercatat melalui halaman selain kanal resmi pendaftaran Syiar QRIS Run 2026, yaitu https://qrisrun.com. Oleh karena itu, data pendaftaran tersebut belum dapat kami proses sebagai peserta resmi.
-
-Dana pendaftaran Kakak akan kami kembalikan sepenuhnya. Untuk mengajukan proses refund, silakan mengisi dan mengonfirmasi data melalui tombol “Ajukan Refund” di bawah ini.
-
-Setelah data diterima dan diverifikasi oleh panitia, refund akan diproses secara bertahap sesuai urutan verifikasi.
-
-Mohon tidak membalas pesan ini karena nomor ini hanya digunakan untuk penyampaian informasi. Setelah formulir dikirim, konfirmasi akan diteruskan langsung ke WhatsApp Admin Syiar QRIS Run 2026.
-
-Kami memohon maaf atas ketidaknyamanan yang terjadi. Terima kasih atas pengertian dan kerja sama Kakak.
-
-Hormat kami,
-Panitia Syiar QRIS Run 2026
-
-————————————————
-Tombol: “Ajukan Refund”
-Tautan: https://qrisrun.com/refund-confirmation`;
-
-      navigator.clipboard.writeText(templateText).then(() => {
-        alert("Template Pesan WA Kusuma berhasil disalin ke clipboard!");
-      }).catch(() => {
-        prompt("Template WA Kusuma:", templateText);
-      });
-    });
-  }
-
-  // Modal Generator Refund Link Handler
-  const btnOpenGen = document.getElementById("btn-open-generator");
-  const refundGenModal = document.getElementById("refundGeneratorModal");
-  const closeGenModal = document.getElementById("closeRefundGeneratorModal");
-  const btnGenSingle = document.getElementById("btnGenSingle");
-  const genSingleName = document.getElementById("genSingleName") as HTMLInputElement;
-  const genSinglePhone = document.getElementById("genSinglePhone") as HTMLInputElement;
-  const genResultBox = document.getElementById("genResultBox");
-  const genResultUrl = document.getElementById("genResultUrl") as HTMLTextAreaElement;
-  const btnCopyGenResult = document.getElementById("btnCopyGenResult");
-
-  if (btnOpenGen && refundGenModal) {
-    btnOpenGen.addEventListener("click", () => {
-      refundGenModal.classList.add("active");
-    });
-  }
-
-  if (closeGenModal && refundGenModal) {
-    closeGenModal.addEventListener("click", () => {
-      refundGenModal.classList.remove("active");
-    });
-  }
-
-  if (btnGenSingle && genSingleName && genSinglePhone && genResultBox && genResultUrl) {
-    btnGenSingle.addEventListener("click", async () => {
-      const name = genSingleName.value.trim();
-      const phone = genSinglePhone.value.trim();
-
-      if (!name || !phone) {
-        alert("Mohon isi Nama dan Nomor WhatsApp peserta.");
-        return;
-      }
-
-      try {
-        btnGenSingle.textContent = "Memproses...";
-        const res = await fetch("/mlebuodewe/admin/api/generate-refund-link", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, phone }),
-        });
-        const data = await res.json();
-        btnGenSingle.textContent = "⚡ Buat Tautan Refund Unik";
-
-        if (data.success && data.url) {
-          genResultUrl.value = data.url;
-          genResultBox.style.display = "block";
-        } else {
-          alert("Gagal membuat link: " + (data.message || "Unknown error"));
-        }
-      } catch (err) {
-        btnGenSingle.textContent = "⚡ Buat Tautan Refund Unik";
-        console.error(err);
-        alert("Terjadi kesalahan koneksi saat membuat link.");
-      }
-    });
-  }
-
-  if (btnCopyGenResult && genResultUrl) {
-    btnCopyGenResult.addEventListener("click", () => {
-      navigator.clipboard.writeText(genResultUrl.value).then(() => {
-        alert("Tautan refund berhasil disalin ke clipboard!");
-      }).catch(() => {
-        prompt("Salin tautan ini:", genResultUrl.value);
       });
     });
   }

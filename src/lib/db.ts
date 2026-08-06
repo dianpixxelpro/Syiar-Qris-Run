@@ -33,8 +33,9 @@ export interface Registration {
 export interface RefundSubmission {
   id?: number;
   registrationId?: number;
-  token: string;
+  token?: string;
   refundCode: string;
+  evidenceToken?: string;
   participantName: string;
   participantPhone: string;
   senderName: string;
@@ -639,6 +640,7 @@ function mapRefund(dbRefund: any): RefundSubmission {
     registrationId: dbRefund.registration_id,
     token: dbRefund.token,
     refundCode: dbRefund.refund_code,
+    evidenceToken: dbRefund.evidence_token,
     participantName: dbRefund.participant_name,
     participantPhone: dbRefund.participant_phone,
     senderName: dbRefund.sender_name,
@@ -651,6 +653,22 @@ function mapRefund(dbRefund: any): RefundSubmission {
     status: dbRefund.status,
     createdAt: dbRefund.created_at,
   };
+}
+
+export async function getRefundByEvidenceToken(code: string): Promise<RefundSubmission | null> {
+  const { data, error } = await supabase
+    .from('refunds')
+    .select('*')
+    .or(`evidence_token.eq.${code},refund_code.eq.${code}`)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code !== 'PGRST116') {
+      console.error(`Error fetching refund for evidence token ${code}:`, error);
+    }
+    return null;
+  }
+  return data ? mapRefund(data) : null;
 }
 
 export async function getRefundByToken(token: string): Promise<RefundSubmission | null> {
@@ -685,22 +703,53 @@ export async function getRefundByRegistrationId(regId: number): Promise<RefundSu
   return data ? mapRefund(data) : null;
 }
 
+export async function getRefundByRrn(rrn: string): Promise<RefundSubmission | null> {
+  const { data, error } = await supabase
+    .from('refunds')
+    .select('*')
+    .eq('rrn_number', rrn)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code !== 'PGRST116') {
+      console.error(`Error fetching refund for rrn ${rrn}:`, error);
+    }
+    return null;
+  }
+  return data ? mapRefund(data) : null;
+}
+
 export async function submitRefundRequest(data: RefundSubmission): Promise<{ success: boolean; message: string; refundCode?: string }> {
-  const existing = await getRefundByToken(data.token);
-  if (existing) {
-    return {
-      success: false,
-      message: `Pengajuan refund untuk token ini sudah dikirim sebelumnya (Kode: ${existing.refundCode}, Status: ${existing.status}).`,
-      refundCode: existing.refundCode,
-    };
+  if (data.token) {
+    const existing = await getRefundByToken(data.token);
+    if (existing) {
+      return {
+        success: false,
+        message: `Pengajuan refund untuk token ini sudah dikirim sebelumnya (Kode: ${existing.refundCode}, Status: ${existing.status}).`,
+        refundCode: existing.refundCode,
+      };
+    }
+  }
+
+  // Cek duplikasi berdasarkan Nomor Referensi / RRN
+  if (data.rrnNumber) {
+    const existingRrn = await getRefundByRrn(data.rrnNumber);
+    if (existingRrn) {
+      return {
+        success: true,
+        message: `Pengajuan refund dengan Nomor Referensi / RRN ${data.rrnNumber} sudah pernah dikirim sebelumnya (Kode: ${existingRrn.refundCode}).`,
+        refundCode: existingRrn.refundCode,
+      };
+    }
   }
 
   const { data: inserted, error } = await supabase
     .from('refunds')
     .insert({
       registration_id: data.registrationId || null,
-      token: data.token,
+      token: data.token || null,
       refund_code: data.refundCode,
+      evidence_token: data.evidenceToken || null,
       participant_name: data.participantName,
       participant_phone: data.participantPhone,
       sender_name: data.senderName,
@@ -725,4 +774,30 @@ export async function submitRefundRequest(data: RefundSubmission): Promise<{ suc
     message: 'Pengajuan refund berhasil dikirim.',
     refundCode: inserted ? inserted.refund_code : data.refundCode,
   };
+}
+
+export async function getAllRefunds(): Promise<RefundSubmission[]> {
+  const { data, error } = await supabase
+    .from('refunds')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching all refunds:', error);
+    return [];
+  }
+  return data ? data.map(mapRefund) : [];
+}
+
+export async function updateRefundStatus(id: number, status: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('refunds')
+    .update({ status })
+    .eq('id', id);
+
+  if (error) {
+    console.error(`Error updating refund status for ID ${id}:`, error);
+    return false;
+  }
+  return true;
 }

@@ -1,0 +1,814 @@
+---
+import AdminLayout from "../../../layouts/AdminLayout.astro";
+import { getAllRefunds, updateRefundStatus } from "../../../lib/db";
+
+let feedbackMsg = "";
+let feedbackType: "success" | "error" = "success";
+
+// Handling POST for status update
+if (Astro.request.method === "POST") {
+  try {
+    const formData = await Astro.request.formData();
+    const action = formData.get("action") as string;
+
+    if (action === "update_status") {
+      const id = parseInt(formData.get("id") as string, 10);
+      const status = formData.get("status") as string;
+
+      if (!isNaN(id) && status) {
+        const ok = await updateRefundStatus(id, status);
+        if (ok) {
+          feedbackMsg = `Status pengajuan refund #${id} berhasil diubah menjadi "${status}".`;
+          feedbackType = "success";
+        } else {
+          feedbackMsg = `Gagal mengubah status pengajuan refund #${id}.`;
+          feedbackType = "error";
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Error handling refund status update:", err);
+    feedbackMsg = "Terjadi kesalahan saat memperbarui status refund.";
+    feedbackType = "error";
+  }
+}
+
+const refunds = await getAllRefunds();
+
+function formatDate(dateStr?: string) {
+  if (!dateStr) return "-";
+  try {
+    const d = new Date(dateStr);
+    return isNaN(d.getTime())
+      ? dateStr
+      : d.toLocaleDateString("id-ID", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+  } catch (e) {
+    return dateStr;
+  }
+}
+---
+
+<AdminLayout title="Kelola Data Refund">
+  <div class="admin-container">
+    <div class="header-section flex-between">
+      <div>
+        <h1 class="page-title">💸 Kelola Data Refund</h1>
+        <p class="page-subtitle">
+          Daftar pengajuan refund peserta Syiar QRIS Run 2026
+        </p>
+      </div>
+      <div class="header-actions">
+        <button
+          type="button"
+          id="btn-export-refunds"
+          class="btn btn-outline btn-small"
+          style="padding: 0.55rem 1rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem;"
+        >
+          <span>⬇️</span> Export Data Refund (CSV)
+        </button>
+      </div>
+    </div>
+
+    {
+      feedbackMsg && (
+        <div
+          class={`alert-box ${feedbackType === "success" ? "alert-success" : "alert-danger"}`}
+        >
+          {feedbackMsg}
+        </div>
+      )
+    }
+
+    <!-- Summary Stats -->
+    <div class="stats-grid">
+      <div class="stat-card glass">
+        <span class="stat-label">Total Pengajuan</span>
+        <span class="stat-value">{refunds.length}</span>
+      </div>
+      <div class="stat-card glass border-warning">
+        <span class="stat-label">Menunggu Verifikasi</span>
+        <span class="stat-value text-warning">
+          {refunds.filter((r) => r.status === "Menunggu Verifikasi").length}
+        </span>
+      </div>
+      <div class="stat-card glass border-success">
+        <span class="stat-label">Disetujui / Selesai</span>
+        <span class="stat-value text-success">
+          {
+            refunds.filter(
+              (r) =>
+                r.status === "Disetujui" ||
+                r.status === "Selesai" ||
+                r.status === "Lunas",
+            ).length
+          }
+        </span>
+      </div>
+      <div class="stat-card glass border-danger">
+        <span class="stat-label">Ditolak</span>
+        <span class="stat-value text-danger">
+          {refunds.filter((r) => r.status === "Ditolak").length}
+        </span>
+      </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-card glass">
+      <div class="filter-grid">
+        <div class="filter-group search-group">
+          <label>Cari (Nama / WA / RRN / Kode)</label>
+          <input
+            type="text"
+            id="search-input"
+            placeholder="Ketik kata kunci pencarian..."
+            class="form-control"
+          />
+        </div>
+        <div class="filter-group">
+          <label>Status Refund</label>
+          <select id="filter-status" class="form-control">
+            <option value="ALL">Semua Status</option>
+            <option value="Menunggu Verifikasi">Menunggu Verifikasi</option>
+            <option value="Disetujui">Disetujui</option>
+            <option value="Ditolak">Ditolak</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table Section -->
+    <div class="table-card glass">
+      <div class="table-responsive">
+        <table class="data-table" id="refunds-table">
+          <thead>
+            <tr>
+              <th>Kode & Waktu</th>
+              <th>Data Peserta</th>
+              <th>Rekening Tujuan Refund</th>
+              <th>Detail Transaksi</th>
+              <th>Bukti</th>
+              <th>Status</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              refunds.length === 0 ? (
+                <tr>
+                  <td colspan="7" class="empty-state">
+                    Belum ada data pengajuan refund.
+                  </td>
+                </tr>
+              ) : (
+                refunds.map((r) => {
+                  const evidenceCode = r.evidenceToken || r.refundCode;
+                  const evidenceUrl = `/refund-evidence/${evidenceCode}`;
+                  const rawPhone = r.participantPhone.replace(/[^0-9]/g, "");
+                  const formattedPhone = rawPhone.startsWith("0")
+                    ? "62" + rawPhone.slice(1)
+                    : rawPhone;
+                  const waUrl = `https://wa.me/${formattedPhone}`;
+
+                  let badgeClass = "badge-pending";
+                  if (
+                    r.status === "Disetujui" ||
+                    r.status === "Selesai" ||
+                    r.status === "Lunas"
+                  ) {
+                    badgeClass = "badge-success";
+                  } else if (r.status === "Ditolak") {
+                    badgeClass = "badge-danger";
+                  }
+
+                  return (
+                    <tr
+                      data-search={`${r.refundCode} ${r.participantName} ${r.participantPhone} ${r.rrnNumber} ${r.accountName} ${r.bankName}`.toLowerCase()}
+                      data-status={r.status}
+                    >
+                      <td>
+                        <div class="code-cell">
+                          <strong class="text-accent">{r.refundCode}</strong>
+                          <span class="sub-text">
+                            {formatDate(r.createdAt)}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="participant-cell">
+                          <strong>{r.participantName}</strong>
+                          <a
+                            href={waUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="phone-link"
+                          >
+                            💬 {r.participantPhone}
+                          </a>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="bank-cell">
+                          <span class="bank-name-badge">{r.bankName}</span>
+                          <strong class="account-num">{r.accountNumber}</strong>
+                          <span class="account-holder">
+                            a.n. {r.accountName}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div class="txn-cell">
+                          <span>
+                            Pengirim: <strong>{r.senderName}</strong>
+                          </span>
+                          <span class="sub-text">RRN: {r.rrnNumber}</span>
+                          <span class="sub-text">Tgl: {r.transactionDate}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <a
+                          href={evidenceUrl}
+                          target="_blank"
+                          class="btn-table btn-proof"
+                        >
+                          🖼️ Lihat Bukti
+                        </a>
+                      </td>
+                      <td>
+                        <span class={`status-badge ${badgeClass}`}>
+                          {r.status}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          class="btn-table btn-edit-status open-status-modal"
+                          data-id={r.id}
+                          data-code={r.refundCode}
+                          data-name={r.participantName}
+                          data-status={r.status}
+                        >
+                          ✏️ Status
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Edit Status Refund -->
+  <div id="statusModal" class="modal-overlay">
+    <div class="modal-content glass" style="max-width: 480px; padding: 2rem;">
+      <div class="modal-header">
+        <h3>✏️ Ubah Status Refund</h3>
+        <button id="closeStatusModal" class="close-modal">&times;</button>
+      </div>
+
+      <form method="POST">
+        <input type="hidden" name="action" value="update_status" />
+        <input type="hidden" name="id" id="modalRefundId" />
+
+        <div style="margin-bottom: 1.2rem;">
+          <label
+            style="display:block; color:#94a3b8; font-size:0.85rem; margin-bottom:0.3rem;"
+            >Kode Pengajuan</label
+          >
+          <strong
+            id="modalRefundCode"
+            style="color:var(--accent); font-size:1.1rem;">-</strong
+          >
+        </div>
+
+        <div style="margin-bottom: 1.5rem;">
+          <label
+            style="display:block; color:#94a3b8; font-size:0.85rem; margin-bottom:0.3rem;"
+            >Nama Peserta</label
+          >
+          <span id="modalParticipantName" style="color:white; font-weight:600;"
+            >-</span
+          >
+        </div>
+
+        <div class="form-group" style="margin-bottom: 2rem;">
+          <label for="modalStatusSelect">Pilih Status Baru *</label>
+          <select
+            name="status"
+            id="modalStatusSelect"
+            class="form-control"
+            required
+            style="width: 100%; padding: 0.65rem; background: #1e293b; color: white; border: 1px solid #334155; border-radius: 6px;"
+          >
+            <option value="Menunggu Verifikasi">Menunggu Verifikasi</option>
+            <option value="Disetujui">Disetujui (Diproses)</option>
+            <option value="Ditolak">Ditolak</option>
+          </select>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:1rem;">
+          <button type="button" id="cancelStatusModal" class="btn btn-outline"
+            >Batal</button
+          >
+          <button type="submit" class="btn btn-primary">Simpan Status</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</AdminLayout>
+
+<script>
+  // Client-side search and status filter
+  const searchInput = document.getElementById(
+    "search-input",
+  ) as HTMLInputElement;
+  const filterStatus = document.getElementById(
+    "filter-status",
+  ) as HTMLSelectElement;
+  const tableRows = document.querySelectorAll("#refunds-table tbody tr");
+
+  function filterTable() {
+    const searchVal = (searchInput?.value || "").toLowerCase().trim();
+    const statusVal = filterStatus?.value || "ALL";
+
+    tableRows.forEach((row) => {
+      const searchData = row.getAttribute("data-search") || "";
+      const rowStatus = row.getAttribute("data-status") || "";
+
+      const matchesSearch = !searchVal || searchData.includes(searchVal);
+      const matchesStatus = statusVal === "ALL" || rowStatus === statusVal;
+
+      if (matchesSearch && matchesStatus) {
+        (row as HTMLElement).style.display = "";
+      } else {
+        (row as HTMLElement).style.display = "none";
+      }
+    });
+  }
+
+  if (searchInput) searchInput.addEventListener("input", filterTable);
+  if (filterStatus) filterStatus.addEventListener("change", filterTable);
+
+  // Modal Status Handler
+  const statusModal = document.getElementById("statusModal");
+  const closeStatusModal = document.getElementById("closeStatusModal");
+  const cancelStatusModal = document.getElementById("cancelStatusModal");
+  const modalRefundId = document.getElementById(
+    "modalRefundId",
+  ) as HTMLInputElement;
+  const modalRefundCode = document.getElementById("modalRefundCode");
+  const modalParticipantName = document.getElementById("modalParticipantName");
+  const modalStatusSelect = document.getElementById(
+    "modalStatusSelect",
+  ) as HTMLSelectElement;
+
+  document.querySelectorAll(".open-status-modal").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-id");
+      const code = btn.getAttribute("data-code");
+      const name = btn.getAttribute("data-name");
+      const status = btn.getAttribute("data-status");
+
+      if (
+        statusModal &&
+        modalRefundId &&
+        modalRefundCode &&
+        modalParticipantName &&
+        modalStatusSelect
+      ) {
+        modalRefundId.value = id || "";
+        modalRefundCode.textContent = code || "-";
+        modalParticipantName.textContent = name || "-";
+        modalStatusSelect.value = status || "Menunggu Verifikasi";
+        statusModal.classList.add("active");
+      }
+    });
+  });
+
+  if (closeStatusModal && statusModal) {
+    closeStatusModal.addEventListener("click", () => {
+      statusModal.classList.remove("active");
+    });
+  }
+
+  if (cancelStatusModal && statusModal) {
+    cancelStatusModal.addEventListener("click", () => {
+      statusModal.classList.remove("active");
+    });
+  }
+
+  // Export CSV Handler
+  const btnExport = document.getElementById("btn-export-refunds");
+  if (btnExport) {
+    btnExport.addEventListener("click", () => {
+      const visibleRows = Array.from(tableRows).filter(
+        (r) => (r as HTMLElement).style.display !== "none",
+      );
+      if (visibleRows.length === 0) {
+        alert("Tidak ada data yang dapat diexport.");
+        return;
+      }
+
+      let csv =
+        "Kode Refund,Waktu Pengajuan,Nama Peserta,No WA,Bank,No Rekening,Nama Pemilik,Nama Pengirim,RRN,Tanggal Transfer,Status\n";
+
+      visibleRows.forEach((row) => {
+        const cells = row.querySelectorAll("td");
+        if (cells.length >= 6) {
+          const code =
+            cells[0].querySelector("strong")?.textContent?.trim() || "";
+          const date =
+            cells[0].querySelector(".sub-text")?.textContent?.trim() || "";
+          const name =
+            cells[1].querySelector("strong")?.textContent?.trim() || "";
+          const phone =
+            cells[1]
+              .querySelector(".phone-link")
+              ?.textContent?.replace("💬", "")
+              .trim() || "";
+          const bank =
+            cells[2].querySelector(".bank-name-badge")?.textContent?.trim() ||
+            "";
+          const accNum =
+            cells[2].querySelector(".account-num")?.textContent?.trim() || "";
+          const accHolder =
+            cells[2]
+              .querySelector(".account-holder")
+              ?.textContent?.replace("a.n.", "")
+              .trim() || "";
+          const sender =
+            cells[3].querySelector("strong")?.textContent?.trim() || "";
+          const subTexts = cells[3].querySelectorAll(".sub-text");
+          const rrn =
+            subTexts[0]?.textContent?.replace("RRN:", "").trim() || "";
+          const transferDate =
+            subTexts[1]?.textContent?.replace("Tgl:", "").trim() || "";
+          const status = cells[5].textContent?.trim() || "";
+
+          csv += `"${code}","${date}","${name}","${phone}","${bank}","'${accNum}","${accHolder}","${sender}","'${rrn}","${transferDate}","${status}"\n`;
+        }
+      });
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `data_refund_${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+</script>
+
+<style>
+  .admin-container {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .flex-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .page-title {
+    font-size: 1.8rem;
+    font-weight: 800;
+    margin: 0 0 0.25rem 0;
+    color: white;
+  }
+
+  .page-subtitle {
+    color: #94a3b8;
+    margin: 0;
+    font-size: 0.95rem;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat-card {
+    padding: 1.25rem 1.5rem;
+    border-radius: 12px;
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .stat-card.border-warning {
+    border-left: 4px solid #f59e0b;
+  }
+  .stat-card.border-success {
+    border-left: 4px solid #10b981;
+  }
+  .stat-card.border-danger {
+    border-left: 4px solid #ef4444;
+  }
+
+  .stat-label {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    font-weight: 600;
+  }
+
+  .stat-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: white;
+  }
+
+  .text-warning {
+    color: #f59e0b;
+  }
+  .text-success {
+    color: #10b981;
+  }
+  .text-danger {
+    color: #ef4444;
+  }
+
+  .filter-card {
+    padding: 1.25rem 1.5rem;
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+  }
+
+  .filter-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.25rem;
+  }
+
+  .filter-group label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #94a3b8;
+    margin-bottom: 0.4rem;
+  }
+
+  .form-control {
+    width: 100%;
+    padding: 0.6rem 0.9rem;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    color: white;
+    font-size: 0.9rem;
+  }
+
+  .table-card {
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .table-responsive {
+    overflow-x: auto;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    text-align: left;
+  }
+
+  .data-table th {
+    background: rgba(15, 23, 42, 0.9);
+    padding: 1rem 1.25rem;
+    color: #94a3b8;
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .data-table td {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: #e2e8f0;
+    vertical-align: top;
+  }
+
+  .data-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .code-cell,
+  .participant-cell,
+  .bank-cell,
+  .txn-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .sub-text {
+    font-size: 0.8rem;
+    color: #94a3b8;
+  }
+
+  .phone-link {
+    color: #34d399;
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .phone-link:hover {
+    text-decoration: underline;
+  }
+
+  .bank-name-badge {
+    display: inline-block;
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    width: fit-content;
+  }
+
+  .account-num {
+    font-family: monospace;
+    font-size: 0.95rem;
+    color: white;
+  }
+
+  .account-holder {
+    font-size: 0.8rem;
+    color: #cbd5e1;
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 0.3rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
+  .badge-pending {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+  }
+
+  .badge-success {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+
+  .badge-danger {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
+  .btn-table {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+  }
+
+  .btn-proof {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+  }
+
+  .btn-proof:hover {
+    background: rgba(59, 130, 246, 0.3);
+  }
+
+  .btn-edit-status {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+  }
+
+  .btn-edit-status:hover {
+    background: rgba(245, 158, 11, 0.3);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #94a3b8;
+  }
+
+  .alert-box {
+    padding: 1rem 1.25rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    font-weight: 600;
+  }
+
+  .alert-success {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+
+  .alert-danger {
+    background: rgba(239, 68, 68, 0.15);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
+  /* Modal Styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .modal-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .modal-content {
+    background: #1e293b;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    width: 90%;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .modal-header h3 {
+    margin: 0;
+    font-size: 1.3rem;
+    color: white;
+  }
+
+  .close-modal {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+  }
+
+  @media (max-width: 768px) {
+    .filter-grid {
+      grid-template-columns: 1fr;
+    }
+    .flex-between {
+      flex-direction: column;
+    }
+  }
+</style>

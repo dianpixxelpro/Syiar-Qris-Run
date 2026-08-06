@@ -29,7 +29,28 @@ let successData: {
 const adminWaPhone =
   import.meta.env.PUBLIC_ADMIN_REFUND_WA ||
   process.env.PUBLIC_ADMIN_REFUND_WA ||
-  "628815083790";
+  "6285331066533";
+
+// 0. Cek Skenario Halaman Sukses via GET Redirect (PRG Pattern)
+const submitted = Astro.url.searchParams.get("submitted");
+if (submitted === "success") {
+  isSubmittedSuccess = true;
+  const paramCode = Astro.url.searchParams.get("code") || "";
+  const paramAccountName = Astro.url.searchParams.get("accountName") || "";
+  const paramAccountNumber = Astro.url.searchParams.get("accountNumber") || "";
+  const paramBankName = Astro.url.searchParams.get("bankName") || "";
+  const paramName = Astro.url.searchParams.get("name") || "";
+  const paramWaUrl = Astro.url.searchParams.get("waUrl") || "";
+
+  successData = {
+    refundCode: paramCode,
+    accountName: paramAccountName,
+    accountNumber: paramAccountNumber,
+    bankName: paramBankName,
+    participantName: paramName,
+    waUrl: paramWaUrl,
+  };
+}
 
 // 1. Validasi Token & Pengisian Data Peserta
 if (token) {
@@ -82,10 +103,18 @@ if (token) {
 if (Astro.request.method === "POST" && !errorMsg && !existingRefund) {
   try {
     const formData = await Astro.request.formData();
-    const inputParticipantName = ((formData.get("participantName") as string) || "").trim();
-    const inputParticipantPhone = ((formData.get("participantPhone") as string) || "").trim();
-    const finalParticipantName = isLocked ? participantName : inputParticipantName;
-    const finalParticipantPhone = isLocked ? participantPhone : inputParticipantPhone;
+    const inputParticipantName = (
+      (formData.get("participantName") as string) || ""
+    ).trim();
+    const inputParticipantPhone = (
+      (formData.get("participantPhone") as string) || ""
+    ).trim();
+    const finalParticipantName = isLocked
+      ? participantName
+      : inputParticipantName;
+    const finalParticipantPhone = isLocked
+      ? participantPhone
+      : inputParticipantPhone;
 
     const senderName = ((formData.get("senderName") as string) || "").trim();
     const transactionDate = (
@@ -99,7 +128,15 @@ if (Astro.request.method === "POST" && !errorMsg && !existingRefund) {
     const accountNumber = (
       (formData.get("accountNumber") as string) || ""
     ).trim();
-    const bankName = ((formData.get("bankName") as string) || "").trim();
+    const bankNameSelect = ((formData.get("bankName") as string) || "").trim();
+    const otherBankName = (
+      (formData.get("otherBankName") as string) || ""
+    ).trim();
+    const finalBankName =
+      bankNameSelect === "Lainnya"
+        ? otherBankName || "Bank Lainnya"
+        : bankNameSelect;
+
     const agreed = formData.get("agreed");
     const proofFile = formData.get("proofFile") as File | null;
 
@@ -116,7 +153,7 @@ if (Astro.request.method === "POST" && !errorMsg && !existingRefund) {
       !rrnNumber ||
       !accountName ||
       !accountNumber ||
-      !bankName
+      !finalBankName
     ) {
       errorMsg = "Mohon lengkapi seluruh formulir data pengajuan.";
     } else if (!agreed) {
@@ -141,18 +178,22 @@ if (Astro.request.method === "POST" && !errorMsg && !existingRefund) {
         const buffer = Buffer.from(await proofFile.arrayBuffer());
         const base64Image = `data:${proofFile.type};base64,${buffer.toString("base64")}`;
 
-        // Generate unique refund code
+        // Generate unique refund code & evidence token
         const randomCode = Math.random()
           .toString(36)
           .substring(2, 7)
           .toUpperCase();
         const refundCode = `RFND-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, "0")}-${randomCode}`;
-        const finalToken = token || `manual_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        const evidenceToken = `${Math.random().toString(36).substring(2, 10)}${Date.now().toString(36)}`;
+        const finalToken =
+          token ||
+          `manual_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
         const refundPayload: RefundSubmission = {
           registrationId,
           token: finalToken,
           refundCode,
+          evidenceToken,
           participantName: finalParticipantName,
           participantPhone: finalParticipantPhone,
           senderName,
@@ -161,35 +202,41 @@ if (Astro.request.method === "POST" && !errorMsg && !existingRefund) {
           proofImage: base64Image,
           accountName,
           accountNumber,
-          bankName,
+          bankName: finalBankName,
           status: "Menunggu Verifikasi",
         };
 
         const result = await submitRefundRequest(refundPayload);
         if (result.success) {
-          isSubmittedSuccess = true;
           const finalRefundCode = result.refundCode || refundCode;
+          const evidenceUrl = `${Astro.url.origin}/refund-evidence/${evidenceToken}`;
 
-          // Encode pesan WhatsApp sesuai spesifikasi
-          const waMessageText = `Halo Admin Syiar QRIS Run 2026, saya ${finalParticipantName} ingin mengonfirmasi pengajuan refund dengan data berikut:
+          // Encode pesan WhatsApp sesuai spesifikasi persis
+          const waMessageText = `Halo *Admin Syiar QRIS Run 2026*, saya ingin mengajukan proses refund dengan data berikut:
 
+*DATA PESERTA*
+Nama peserta: ${finalParticipantName}
+Nomor WhatsApp: ${finalParticipantPhone}
+
+*DATA TRANSAKSI*
+Nama pengirim: ${senderName}
+Tanggal transaksi: ${transactionDate}
+Waktu transaksi: ${transactionTime}
+Nomor referensi/RRN: ${rrnNumber}
+Bukti transaksi: ${evidenceUrl}
+
+*REKENING TUJUAN REFUND*
 Nama pemilik rekening: ${accountName}
 Nomor rekening: ${accountNumber}
-Nama bank: ${bankName}
-Kode pengajuan: ${finalRefundCode}
+Nama bank: ${finalBankName}
 
-Data dan bukti transaksi telah saya kirimkan melalui formulir refund. Mohon dilakukan verifikasi. Terima kasih.`;
+Data yang saya sampaikan sudah benar. Mohon dilakukan verifikasi untuk proses refund. Terima kasih.`;
 
           const waUrl = `https://wa.me/${adminWaPhone}?text=${encodeURIComponent(waMessageText)}`;
 
-          successData = {
-            refundCode: finalRefundCode,
-            accountName,
-            accountNumber,
-            bankName,
-            participantName: finalParticipantName,
-            waUrl,
-          };
+          const targetRedirect = `${Astro.url.pathname}?submitted=success&code=${encodeURIComponent(finalRefundCode)}&name=${encodeURIComponent(finalParticipantName)}&accountName=${encodeURIComponent(accountName)}&accountNumber=${encodeURIComponent(accountNumber)}&bankName=${encodeURIComponent(finalBankName)}&waUrl=${encodeURIComponent(waUrl)}`;
+
+          return Astro.redirect(targetRedirect, 303);
         } else {
           errorMsg = result.message;
         }
@@ -205,14 +252,28 @@ Data dan bukti transaksi telah saya kirimkan melalui formulir refund. Mohon dila
 // Data WhatsApp jika sudah pernah mengajukan sebelumnya (untuk tombol WA manual)
 let existingWaUrl = "";
 if (existingRefund) {
-  const waMsg = `Halo Admin Syiar QRIS Run 2026, saya ${existingRefund.participantName} ingin mengonfirmasi pengajuan refund dengan data berikut:
+  const existingEvidenceCode =
+    existingRefund.evidenceToken || existingRefund.refundCode;
+  const existingEvidenceUrl = `${Astro.url.origin}/refund-evidence/${existingEvidenceCode}`;
 
+  const waMsg = `Halo Admin Syiar QRIS Run 2026, saya ingin mengajukan proses refund dengan data berikut:
+
+DATA PESERTA
+Nama peserta: ${existingRefund.participantName}
+Nomor WhatsApp: ${existingRefund.participantPhone}
+
+DATA TRANSAKSI
+Nama pengirim: ${existingRefund.senderName}
+Tanggal transaksi: ${existingRefund.transactionDate}
+Nomor referensi/RRN: ${existingRefund.rrnNumber}
+Bukti transaksi: ${existingEvidenceUrl}
+
+REKENING TUJUAN REFUND
 Nama pemilik rekening: ${existingRefund.accountName}
 Nomor rekening: ${existingRefund.accountNumber}
 Nama bank: ${existingRefund.bankName}
-Kode pengajuan: ${existingRefund.refundCode}
 
-Data dan bukti transaksi telah saya kirimkan melalui formulir refund. Mohon dilakukan verifikasi. Terima kasih.`;
+Data yang saya sampaikan sudah benar. Mohon dilakukan verifikasi untuk proses refund. Terima kasih.`;
   existingWaUrl = `https://wa.me/${adminWaPhone}?text=${encodeURIComponent(waMsg)}`;
 }
 ---
@@ -498,6 +559,21 @@ Data dan bukti transaksi telah saya kirimkan melalui formulir refund. Mohon dila
                   </select>
                 </div>
 
+                <div
+                  class="form-group"
+                  id="otherBankContainer"
+                  style="display: none; margin-top: 0.8rem;"
+                >
+                  <label for="otherBankName">Nama Bank Lainnya</label>
+                  <input
+                    type="text"
+                    id="otherBankName"
+                    name="otherBankName"
+                    placeholder="Masukkan nama bank Anda (misal: Bank Mega, SeaBank, Bank Jago)"
+                    disabled={Boolean(existingRefund)}
+                  />
+                </div>
+
                 {/* Checkbox Konfirmasi */}
                 <div class="checkbox-group">
                   <input
@@ -585,6 +661,27 @@ Data dan bukti transaksi telah saya kirimkan melalui formulir refund. Mohon dila
         previewSelected.style.display = "none";
       }
     });
+  }
+
+  // Toggle Bank Lainnya manual input
+  const bankSelect = document.getElementById("bankName");
+  const otherBankContainer = document.getElementById("otherBankContainer");
+  const otherBankInput = document.getElementById("otherBankName");
+
+  if (bankSelect && otherBankContainer && otherBankInput) {
+    const toggleOtherBank = () => {
+      if (bankSelect.value === "Lainnya") {
+        otherBankContainer.style.display = "block";
+        otherBankInput.required = true;
+      } else {
+        otherBankContainer.style.display = "none";
+        otherBankInput.required = false;
+        otherBankInput.value = "";
+      }
+    };
+
+    bankSelect.addEventListener("change", toggleOtherBank);
+    toggleOtherBank();
   }
 
   // Automatic redirect to WhatsApp on success after 1.5 seconds
