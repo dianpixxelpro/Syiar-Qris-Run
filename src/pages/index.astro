@@ -3,6 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import EventCard from "../components/EventCard.astro";
 import CTA from "../components/CTA.astro";
 import RuteComponent from "../components/Rute.astro";
+import ParkirComponent from "../components/Parkir.astro";
 import { getUpcomingEvents, getFinishedEvents, getEventById } from "../lib/db";
 import { showSelamatCard } from "../config";
 
@@ -309,6 +310,9 @@ const categories = [
   <!-- Rute Section -->
   <RuteComponent />
 
+  <!-- Lahan Parkir Section -->
+  <ParkirComponent />
+
     <CTA />
 
     <!-- FAQ Section -->
@@ -435,6 +439,16 @@ const categories = [
                 Peserta dapat didiskualifikasi jika memotong rute, menggunakan
                 kendaraan, atau tindakan tidak sportif.
               </p>
+            </div>
+          </div>
+
+          <div class="faq-item glass">
+            <button class="faq-question">
+              <span>Kapan pengambilan racepack?</span>
+              <span class="faq-icon">↓</span>
+            </button>
+            <div class="faq-answer">
+              <p>Pengambilan racepack dilakukan pada <strong>Jumat - Sabtu, 14-15 Agustus 2026</strong>, pukul <strong>09:00 - 18:00 WIB</strong>.</p>
             </div>
           </div>
 
